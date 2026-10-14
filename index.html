@@ -142,7 +142,7 @@ function title(){if(!st.sel)return 'Minas Gerais';return {macro:'Macro ',micro:'
 function trFor(pred){let t=0;for(const c in D.tr)if(pred(c))t+=D.tr[c];return t}
 // ---------- modo claro/escuro
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{document.documentElement.dataset.mode=b.dataset.m;document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));render(false)});
-function render(anim=true){({geral,mun:munView,pols:polsView,pol:polView})[st.view]()}
+function render(anim=true){({geral,mun:munView,pols:polsView,pol:polView,ana:anaView})[st.view]()}
 // ---------- VISÃO GERAL
 function geral(){
   const R=filt(),tot=sum(R);
@@ -353,22 +353,23 @@ const pctCol=v=>v==null?css('--mnull'):d3.interpolateRgbBasis(['#E11D48','#F59E0
 const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const nfx=v=>v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2});
 function perLbl(i){const p=MO.periodos[i];if(!p||!p[0])return '—';const a=p[0],b=p[1];const ma=MES[+a.slice(5,7)-1],mb=MES[+b.slice(5,7)-1];return a.slice(0,4)===b.slice(0,4)?`${ma}–${mb}/${b.slice(0,4)}`:`${ma}/${a.slice(2,4)}–${mb}/${b.slice(2,4)}`}
+const vaOf=r=>(ps.mom==='depois'&&r.del>=0&&r.corr!=null&&r.vm>0)?Math.min(r.corr,r.vm):(r.va||0);
 function agg(R){const o={n:R.length,at:0,na:0,ni:0,vm:0,va:0,rec:0,def:0,ind:0,muns:new Set(),inds:new Set()};
-  for(const r of R){o[['at','na','ni'][r.st]]++;o.vm+=r.vm;o.va+=r.va||0;if(r.rec)o.rec++;if(r.del===1)o.def++;if(r.del===0)o.ind++;o.muns.add(r.c);o.inds.add(r.ind)}
+  for(const r of R){o[['at','na','ni'][r.st]]++;o.vm+=r.vm;o.va+=vaOf(r);if(r.rec)o.rec++;if(r.del===1)o.def++;if(r.del===0)o.ind++;o.muns.add(r.c);o.inds.add(r.ind)}
   o.pct=(o.at+o.na)?o.at/(o.at+o.na):null;o.pv=o.vm?o.va/o.vm:null;return o}
 const regKey=(lvl,c)=>lvl==='mun'?c:M(c)[LV[lvl]];
-let ps={metric:'valor',bloco:'',sub:'',q:'',reg:'',hm:'macro',pol:null,per:'',ind:'',lvl:'macro',sel:null,mq:'',open:null};
+let ps={mom:'depois',metric:'valor',bloco:'',sub:'',q:'',reg:'',hm:'macro',pol:null,per:'',ind:'',lvl:'macro',sel:null,mq:'',open:null};
 const perf=o=>ps.metric==='valor'?o.pv:o.pct;
 const MLBL=()=>ps.metric==='valor'?'recurso apurado':'metas atingidas (status)';
 function cellPerf(x){return ps.metric==='valor'?(x.vm?x.va/x.vm:null):((x.at+x.na)?x.at/(x.at+x.na):null)}
-function metricSeg(){return `<span class="k">Medir por</span><div class="seg" id="fmet"><button data-m="valor" class="${ps.metric==='valor'?'on':''}" title="Valor Apurado ÷ Valor da Meta">% do recurso apurado</button><button data-m="status" class="${ps.metric==='status'?'on':''}" title="Coluna Status Cumprimento">Status no sistema</button></div>`}
-function bindMetric(fn){document.querySelectorAll('#fmet button').forEach(b=>b.onclick=()=>{ps.metric=b.dataset.m;fn()})}
+function metricSeg(){return `<span class="k">Momento</span><div class="seg" id="fmom"><button data-m="antes" class="${ps.mom==='antes'?'on':''}" title="Valor Apurado na coleta">Antes da CMA</button><button data-m="depois" class="${ps.mom==='depois'?'on':''}" title="Aplica a Correção da Parcela CMA dos recursos deliberados">Depois da CMA</button></div><span class="k">Medir por</span><div class="seg" id="fmet"><button data-m="valor" class="${ps.metric==='valor'?'on':''}" title="Valor Apurado ÷ Valor da Meta">% do recurso apurado</button><button data-m="status" class="${ps.metric==='status'?'on':''}" title="Coluna Status Cumprimento">Status no sistema</button></div>`}
+function bindMetric(fn){document.querySelectorAll('#fmom button').forEach(b=>b.onclick=()=>{ps.mom=b.dataset.m;fn()});document.querySelectorAll('#fmet button').forEach(b=>b.onclick=()=>{ps.metric=b.dataset.m;fn()})}
 function regFilter(R){if(!ps.reg)return R;const [l,v]=ps.reg.split('|');return R.filter(r=>M(r.c)[LV[l]]===v)}
 function ring(p,size=58){const v=p==null?0:Math.min(1,p);return `<div style="width:${size}px;height:${size}px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(${pctCol(p)} ${v*360}deg,var(--track) 0);animation:up .6s both"><div style="width:${size-12}px;height:${size-12}px;border-radius:50%;background:var(--bg1);display:grid;place-items:center;font-size:${size>50?12:10}px;font-weight:800;color:var(--strong)">${p==null?'—':Math.round(p*100)+'%'}</div></div>`}
 function stBar(o){const t=o.at+o.na+o.ni||1;return `<div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--track)">${[o.at,o.na,o.ni].map((v,i)=>`<i style="display:block;width:${v/t*100}%;background:${STC[i]};transform-origin:left;animation:grow 1s ${200+i*120}ms both"></i>`).join('')}</div>`}
 function mBar(o){if(ps.metric!=='valor')return stBar(o);const p=o.pv;return `<div style="height:8px;border-radius:99px;overflow:hidden;background:var(--track)"><i style="display:block;height:100%;width:${Math.min(1,p||0)*100}%;background:${pctCol(p)};border-radius:99px;transform-origin:left;animation:grow 1s .2s both"></i></div>`}
-function navBar(){return `<div class="row" style="margin-bottom:14px;flex-wrap:wrap"><div class="seg" id="nav"><button data-v="geral" class="${st.view==='geral'||st.view==='mun'?'on':''}">Pagamentos</button><button data-v="pols" class="${st.view==='pols'||st.view==='pol'?'on':''}">Políticas</button></div>${MO?`<span class="s" style="margin:0">Monitoramento das políticas · última etapa finalizada em ${dtl(MO.fin)}</span>`:''}</div>`}
-function bindNav(){document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{if(b.dataset.v==='pols'){openPols()}else{st.view='geral';geral()}})}
+function navBar(){return `<div class="row" style="margin-bottom:14px;flex-wrap:wrap"><div class="seg" id="nav"><button data-v="geral" class="${st.view==='geral'||st.view==='mun'?'on':''}">Pagamentos</button><button data-v="pols" class="${st.view==='pols'||st.view==='pol'?'on':''}">Políticas</button><button data-v="ana" class="${st.view==='ana'?'on':''}">Análise para intervenção</button></div>${MO?`<span class="s" style="margin:0">Monitoramento das políticas · última etapa finalizada em ${dtl(MO.fin)}</span>`:''}</div>`}
+function bindNav(){document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{const v=b.dataset.v;if(v==='pols')openPols();else if(v==='ana')openAna();else{st.view='geral';geral()}})}
 function regionSelect(id,val){const macros=[...new Set(Object.values(D.mun).map(m=>m[3]))].filter(x=>x&&x!=='—').sort(),urss=[...new Set(Object.values(D.mun).map(m=>m[1]))].filter(x=>x&&x!=='—').sort();
   return `<select id="${id}"><option value="">Minas Gerais (todas as regiões)</option><optgroup label="Macrorregiões">${macros.map(m=>`<option value="macro|${esc(m)}" ${val==='macro|'+m?'selected':''}>${esc(m)}</option>`).join('')}</optgroup><optgroup label="Unidades Regionais (URS)">${urss.map(m=>`<option value="urs|${esc(m)}" ${val==='urs|'+m?'selected':''}>URS ${esc(m)}</option>`).join('')}</optgroup></select>`}
 
@@ -428,7 +429,7 @@ function polsView(){
 function heatmap(pols){
   const el=document.getElementById('heat');const lvl=ps.hm,i=LV[lvl];
   const regs=[...new Set(MR.map(r=>M(r.c)[i]))].filter(x=>x&&x!=='—').sort();
-  const cell={};for(const r of MR){const k=r.pol+'|'+M(r.c)[i];(cell[k]=cell[k]||{at:0,na:0,va:0,vm:0});if(r.st===0)cell[k].at++;else if(r.st===1)cell[k].na++;cell[k].va+=r.va||0;cell[k].vm+=r.vm}
+  const cell={};for(const r of MR){const k=r.pol+'|'+M(r.c)[i];(cell[k]=cell[k]||{at:0,na:0,va:0,vm:0});if(r.st===0)cell[k].at++;else if(r.st===1)cell[k].na++;cell[k].va+=vaOf(r);cell[k].vm+=r.vm}
   const cw=30;
   el.innerHTML=`<table style="border-collapse:separate;border-spacing:3px;font-size:10px"><thead><tr><th></th>${pols.map(x=>`<th title="${esc(x.p.nome)}" style="height:120px;vertical-align:bottom;padding:0"><div style="writing-mode:vertical-rl;transform:rotate(180deg);max-height:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--mut);font-weight:600">${esc(x.p.nome.length>34?x.p.nome.slice(0,33)+'…':x.p.nome)}</div></th>`).join('')}</tr></thead>
   <tbody>${regs.map(g=>`<tr><td style="white-space:nowrap;color:var(--txt);padding-right:8px;font-weight:600">${lvl==='urs'?'':''}${esc(g)}</td>${pols.map(x=>{const c=cell[x.i+'|'+g];const p=c?cellPerf(c):null;if(p==null)return `<td style="width:${cw}px;height:22px;border-radius:5px;background:var(--soft)"></td>`;return `<td class="hc" data-p="${x.i}" data-r="${esc(lvl+'|'+g)}" title="${esc(x.p.nome)} · ${esc(g)}: ${pc(p)}" style="width:${cw}px;height:22px;border-radius:5px;background:${pctCol(p)};cursor:pointer;text-align:center;color:#0B2324;font-weight:700;font-size:9px">${Math.round(p*100)}</td>`}).join('')}</tr>`).join('')}</tbody></table>`;
@@ -511,7 +512,7 @@ function polMap(R){
   const el=document.getElementById('pmap');const W=el.clientWidth,H=400;const lvl=ps.lvl;
   const topo=D['topo_'+(lvl==='mun'?'municipios':lvl)];const fc=topojson.feature(topo,topo.objects[Object.keys(topo.objects)[0]]);
   const path=d3.geoPath(d3.geoMercator().fitSize([W,H],fc));const fk=f=>lvl==='mun'?f.properties.cod_ibge:f.properties[lvl];
-  const a={};for(const r of R){const k=regKey(lvl,r.c);(a[k]=a[k]||{at:0,na:0,n:0,va:0,vm:0});a[k].n++;if(r.st===0)a[k].at++;else if(r.st===1)a[k].na++;a[k].va+=r.va||0;a[k].vm+=r.vm}
+  const a={};for(const r of R){const k=regKey(lvl,r.c);(a[k]=a[k]||{at:0,na:0,n:0,va:0,vm:0});a[k].n++;if(r.st===0)a[k].at++;else if(r.st===1)a[k].na++;a[k].va+=vaOf(r);a[k].vm+=r.vm}
   const svg=d3.select(el).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%').attr('height',H);const tip=document.getElementById('tip');
   svg.selectAll('path').data(fc.features).join('path').attr('d',path).attr('stroke',css('--mstroke')).attr('stroke-width',lvl==='mun'?.35:1).style('cursor','pointer')
    .attr('fill',f=>{const x=a[fk(f)];const p=x?cellPerf(x):null;return p!=null?pctCol(p):css('--mnull')})
@@ -521,7 +522,7 @@ function polMap(R){
 }
 function polRank(R){
   const lvl=ps.lvl==='macro'?'macro':'urs';const i=LV[lvl];const a={};
-  for(const r of R){const k=M(r.c)[i];if(!k||k==='—')continue;(a[k]=a[k]||{at:0,na:0,n:0,va:0,vm:0});a[k].n++;if(r.st===0)a[k].at++;else if(r.st===1)a[k].na++;a[k].va+=r.va||0;a[k].vm+=r.vm}
+  for(const r of R){const k=M(r.c)[i];if(!k||k==='—')continue;(a[k]=a[k]||{at:0,na:0,n:0,va:0,vm:0});a[k].n++;if(r.st===0)a[k].at++;else if(r.st===1)a[k].na++;a[k].va+=vaOf(r);a[k].vm+=r.vm}
   const rows=Object.entries(a).map(([k,x])=>({k,p:cellPerf(x),n:x.n})).sort((x,y)=>(y.p??-1)-(x.p??-1));
   const sk=ps.sel&&(ps.lvl===lvl)?ps.sel:null;
   document.getElementById('rank').innerHTML=rows.map((x,j)=>`<div class="rk" data-k="${esc(x.k)}" style="margin:7px 0;cursor:pointer;${sk&&sk!==x.k?'opacity:.45':''}"><div class="row" style="justify-content:space-between;font-size:11px"><span class="ell" style="max-width:70%"><b class="muted" style="display:inline-block;width:20px">${j+1}</b>${esc(lvl==='urs'?'URS '+x.k:x.k)}</span><b style="color:${pctCol(x.p)}">${pc(x.p)}</b></div><div class="bar" style="margin-top:3px"><i style="width:${Math.min(1,x.p||0)*100}%;background:${pctCol(x.p)};animation-delay:${150+j*40}ms"></i></div></div>`).join('');
@@ -564,10 +565,145 @@ function munPolicies(c){
      <div class="s">${[...new Set(x.a.map(r=>perLbl(r.per)))].join(' · ')} · apurado <b class="acc">${fmt.format(x.o.va)}</b> de ${fmt.format(x.o.vm)}</div></div>${ring(x.o.pv,52)}</div>
     <div style="margin-top:8px">${x.a.sort((a,b)=>a.st-b.st||a.ind-b.ind).map(r=>`<details class="rc" style="padding:6px 0"><summary><div class="row" style="gap:8px"><span title="${ps.metric==='valor'?(r.vm?pc((r.va||0)/r.vm)+' do valor apurado':'sem valor vinculado'):ST[r.st]}" style="width:8px;height:8px;border-radius:50%;background:${ps.metric==='valor'?(r.vm?pctCol((r.va||0)/r.vm):'#94A3B8'):STC[r.st]};flex:none"></span><span class="ell" style="flex:1;font-size:11px">${esc(MO.inds[r.ind].nome)}</span><span class="s" style="margin:0;white-space:nowrap">${nfx(r.res)} / meta ${nfx(r.meta)}</span>${r.rec?`<span class="tag tag2" style="font-size:8px;margin:0">recurso</span>`:''}</div></summary>
      <div class="det" style="margin-top:6px"><div><div class="k">Status no sistema</div><div class="dv" style="color:${STC[r.st]};font-weight:700">${ST[r.st]}</div></div><div><div class="k">Recurso apurado</div><div class="dv" style="font-weight:700;color:${pctCol(r.vm?(r.va||0)/r.vm:null)}">${r.vm?pc((r.va||0)/r.vm):'—'}</div></div><div><div class="k">Faixa de desempenho</div><div class="dv">${r.fx>=0?esc(MO.faixas[r.fx]):'—'}</div></div>
-     <div><div class="k">Valor da meta</div><div class="dv">${fmt.format(r.vm)}</div></div><div><div class="k">Valor apurado</div><div class="dv acc">${r.va!=null?fmt.format(r.va):'—'}</div></div>
+     <div><div class="k">Valor da meta</div><div class="dv">${fmt.format(r.vm)}</div></div><div><div class="k">Valor apurado (antes → depois da CMA)</div><div class="dv acc">${r.va!=null?fmt.format(r.va):'—'}${r.del>=0&&r.corr!=null?' → '+fmt.format(r.vm>0?Math.min(r.corr,r.vm):r.corr):''}</div></div>
      <div><div class="k">Etapa alcançada</div><div class="dv">${ETP[r.et-1]}</div></div><div><div class="k">Fonte</div><div class="dv">${esc(MO.inds[r.ind].fonte)}</div></div>
      ${r.rec?`<div class="full sep" style="padding-top:8px"><div class="k">Recurso · ${r.del===1?'Deferido':r.del===0?'Indeferido':'em análise'}${r.cat>=0?' · '+esc(MO.cats[r.cat]):''}</div>${r.just>=0?`<div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.just])}</div>`:''}${r.par>=0?`<div class="k" style="margin-top:6px">Parecer da CMA</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.par])}</div>`:''}</div>`:''}</div></details>`).join('')}</div>
    </div>`}).join('')}</div>`;
+}
+
+// ===================== ANÁLISE PARA INTERVENÇÃO =====================
+let an={lvl:'urs',lim:0.5,bloco:'',pol:'',urs:'',pq:''};
+const vaAntes=r=>r.va||0, vaDepois=r=>(r.del>=0&&r.corr!=null&&r.vm>0)?Math.min(r.corr,r.vm):(r.va||0);
+const LVN={macro:'Macrorregião',micro:'Microrregião',urs:'URS'};
+function openAna(){st.view='ana';window.scrollTo({top:0,behavior:'smooth'});anaView()}
+function anaBase(){let R=MR;if(an.bloco)R=R.filter(r=>MO.pols[r.pol].bloco===an.bloco);if(an.pol!=='')R=R.filter(r=>r.pol===+an.pol);return R}
+function csvDownload(nome,linhas){const s='﻿'+linhas.map(l=>l.map(v=>{v=v==null?'':String(v);return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));a.download=nome;document.body.appendChild(a);a.click();a.remove()}
+const brl2=v=>v==null?'':Number(v).toFixed(2).replace('.',',');
+function anaView(){
+  const app=document.getElementById('app');
+  if(!MO){app.innerHTML=navBar()+'<div class="g" style="padding:30px;text-align:center">Dados de monitoramento não publicados.</div>';bindNav();return}
+  const R=anaBase();const vm=R.reduce((s,r)=>s+r.vm,0),va0=R.reduce((s,r)=>s+vaAntes(r),0),va1=R.reduce((s,r)=>s+vaDepois(r),0);
+  const rec=R.filter(r=>r.rec),def=rec.filter(r=>r.del===1),ind=rec.filter(r=>r.del===0),pend=rec.filter(r=>r.del<0);
+  const incons=R.filter(r=>r.del>=0&&r.corr!=null&&r.vm>0&&r.corr>r.vm+0.01).length;
+  // municípios críticos
+  const bm={};for(const r of R){if(r.c==='0'||!r.vm)continue;(bm[r.c]=bm[r.c]||{vm:0,va:0});bm[r.c].vm+=r.vm;bm[r.c].va+=vaOf(r)}
+  const crit=Object.values(bm).filter(x=>x.va/x.vm<an.lim).length,nm=Object.keys(bm).length;
+  const blocos=[...new Set(MO.pols.map(p=>p.bloco))].sort();
+  app.innerHTML=navBar()+`
+  <div class="g a" style="padding:16px 20px;margin-bottom:14px">
+   <div class="grad" style="font-size:24px;font-weight:800">Análise para intervenção no território</div>
+   <div class="s" style="font-size:12px">Resultados do monitoramento antes e depois da avaliação das CMA, com disparidades regionais, regiões mais frágeis e indicadores que concentram recursos. Serve de base para os planos de intervenção e para qualificar a política ou o indicador.</div>
+  </div>
+  <div class="g flt a" style="margin:0 0 14px">
+   ${metricSeg()}
+   <span class="k">Limiar crítico</span><select id="alim">${[.3,.5,.7,.9].map(v=>`<option value="${v}" ${an.lim===v?'selected':''}>abaixo de ${v*100}% do recurso apurado</option>`).join('')}</select>
+   <span class="k">Bloco</span><select id="abl"><option value="">Todos</option>${blocos.map(b=>`<option ${an.bloco===b?'selected':''}>${esc(b)}</option>`).join('')}</select>
+   <span class="k">Política</span><select id="apol" style="flex:1;min-width:220px"><option value="">Todas as políticas</option>${MO.pols.map((p,i)=>[p,i]).filter(([p])=>!an.bloco||p.bloco===an.bloco).sort((a,b)=>a[0].nome.localeCompare(b[0].nome)).map(([p,i])=>`<option value="${i}" ${String(i)===an.pol?'selected':''}>${esc(p.nome)}</option>`).join('')}</select>
+  </div>
+  <div class="kpis">
+   <div class="g kpi a"><div class="k">Recurso vinculado às metas</div><div class="v grad" style="font-size:28px">${ab(vm)}</div><div class="s">${n0.format(R.length)} unidades monitoradas</div></div>
+   <div class="g kpi a" style="animation-delay:80ms"><div class="k">Apurado antes da CMA</div><div class="v" style="color:${pctCol(vm?va0/vm:null)}">${pc(vm?va0/vm:null)}</div><div class="s">${ab(va0)}</div></div>
+   <div class="g kpi a" style="animation-delay:160ms"><div class="k">Depois da avaliação das CMA</div><div class="v" style="color:${pctCol(vm?va1/vm:null)}">${pc(vm?va1/vm:null)}</div><div class="s">${ab(va1)} · <span class="up">+${ab(va1-va0).replace('R$ ','R$ ')}</span> após as deliberações das CMA</div></div>
+   <div class="g kpi a warn" style="animation-delay:240ms"><div class="k">Recurso não apurado</div><div class="v">${ab(vm-(ps.mom==='depois'?va1:va0))}</div><div class="s">${ps.mom==='depois'?'depois':'antes'} da CMA · o que os municípios deixaram de receber</div></div>
+   <div class="g kpi a" style="animation-delay:320ms;border-color:rgba(244,63,94,.4)"><div class="k" style="color:#FB7185">Municípios críticos</div><div class="v">${n0.format(crit)}</div><div class="s">de ${n0.format(nm)} · abaixo de ${an.lim*100}% do recurso</div></div>
+  </div>
+  <div class="mgrid" style="grid-template-columns:1.1fr 1fr;margin-top:0">
+   <div class="g card a"><div class="ct"><span class="k">Antes × depois da avaliação das CMA · por política</span><span class="legend"><span style="color:#94A3B8">● antes</span><span class="acc">● depois</span></span></div><div id="abd" style="max-height:470px;overflow:auto;padding-right:4px"></div>
+    <div class="s" style="margin-top:8px">${n0.format(rec.length)} recursos às CMA: <b class="up">${def.length} deferidos</b> · ${ind.length} indeferidos${pend.length?` · ${pend.length} sem deliberação`:''}.${incons?` ${incons} correções acima do valor da meta foram limitadas ao valor da meta.`:''}</div></div>
+   <div class="g card a" style="animation-delay:80ms"><div class="ct"><span class="k">Matriz de priorização dos indicadores</span><span class="s" style="margin:0">clique numa bolha para abrir</span></div><div id="amx"></div>
+    <div class="s">Eixo X: participação do indicador no recurso total · eixo Y: ${MLBL()} · tamanho: municípios. Quadrante vermelho = muito recurso e baixo desempenho.</div></div>
+  </div>
+  <div class="g card a" style="margin-top:14px"><div class="ct"><span class="k">Regiões mais frágeis</span><div class="seg" id="alv">${['macro','urs','micro'].map(k=>`<button data-k="${k}" class="${an.lvl===k?'on':''}">${LVN[k]}</button>`).join('')}</div></div>
+   <div class="main" style="grid-template-columns:1fr 1.5fr;margin:0"><div id="amap" style="height:420px"></div><div id="afr" style="max-height:440px;overflow:auto"></div></div></div>
+  <div class="g card a" style="margin-top:14px"><div class="ct"><span class="k">Disparidades regionais · amplitude entre a melhor e a pior macrorregião em cada política</span><span class="legend"><span style="color:#E11D48">● pior macro</span><span style="color:#10B981">● melhor macro</span><span class="strong">| MG</span></span></div><div id="adis"></div></div>
+  <div class="g card a" style="margin-top:14px"><div class="ct"><span class="k">Lista de prioridades para intervenção · município × política abaixo do limiar</span>
+    <div class="row" style="flex-wrap:wrap"><select id="aurs"><option value="">Todas as URS</option>${[...new Set(Object.values(D.mun).map(m=>m[1]))].filter(x=>x&&x!=='—').sort().map(u=>`<option ${an.urs===u?'selected':''}>${esc(u)}</option>`).join('')}</select>
+    <input id="apq" placeholder="Buscar município" value="${esc(an.pq)}" style="background:var(--ctl);color:var(--strong);border:1px solid var(--gb);border-radius:99px;padding:6px 12px;font:inherit;font-size:12px">
+    <button class="back" id="acsv">⬇ Baixar planilha (CSV)</button></div></div>
+   <div id="apri" style="max-height:560px;overflow:auto"></div></div>`;
+  bindNav();
+  bindMetric(anaView);
+  document.getElementById('alim').onchange=e=>{an.lim=+e.target.value;anaView()};
+  document.getElementById('abl').onchange=e=>{an.bloco=e.target.value;an.pol='';anaView()};
+  document.getElementById('apol').onchange=e=>{an.pol=e.target.value;anaView()};
+  document.querySelectorAll('#alv button').forEach(b=>b.onclick=()=>{an.lvl=b.dataset.k;anaFragil(R)});
+  document.getElementById('aurs').onchange=e=>{an.urs=e.target.value;anaPri(R)};
+  const q=document.getElementById('apq');q.oninput=()=>{an.pq=q.value;anaPri(R)};
+  document.getElementById('acsv').onclick=()=>anaPri(R,true);
+  anaBefore(R);anaMatrix(R);anaFragil(R);anaDisp(R);anaPri(R);
+}
+function anaBefore(R){
+  const by={};for(const r of R)(by[r.pol]=by[r.pol]||[]).push(r);
+  const rows=Object.entries(by).map(([p,a])=>{const vm=a.reduce((s,r)=>s+r.vm,0),v0=a.reduce((s,r)=>s+vaAntes(r),0),v1=a.reduce((s,r)=>s+vaDepois(r),0);return {p:+p,vm,a0:vm?v0/vm:null,a1:vm?v1/vm:null,d:v1-v0,rec:a.filter(r=>r.rec).length,def:a.filter(r=>r.del===1).length}}).sort((x,y)=>y.d-x.d||(x.a1??0)-(y.a1??0));
+  document.getElementById('abd').innerHTML=rows.map((x,j)=>`<div class="pl2" data-p="${x.p}" style="margin:9px 0;cursor:pointer">
+   <div class="row" style="justify-content:space-between;font-size:11px;gap:8px"><span class="ell" style="flex:1">${esc(MO.pols[x.p].nome)}</span><span style="white-space:nowrap"><span class="muted">${pc(x.a0)}</span> → <b style="color:${pctCol(x.a1)}">${pc(x.a1)}</b> ${x.d>0.5?`<span class="tag tag3" style="font-size:9px;margin:0 0 0 4px">+${ab(x.d)}</span>`:''}</span></div>
+   <div style="position:relative;height:10px;margin-top:4px;border-radius:99px;background:var(--track);overflow:hidden">
+    <i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(1,x.a1||0)*100}%;background:${pctCol(x.a1)};opacity:.9;border-radius:99px;transform-origin:left;animation:grow 1s ${j*40}ms both"></i>
+    <i style="position:absolute;left:0;top:3px;height:4px;width:${Math.min(1,x.a0||0)*100}%;background:#E2E8F0;opacity:.85;border-radius:99px;transform-origin:left;animation:grow 1s ${j*40+150}ms both"></i></div>
+   <div class="s" style="margin-top:2px">${x.rec} recurso(s) · ${x.def} deferido(s) · recurso vinculado ${ab(x.vm)}</div></div>`).join('');
+  document.querySelectorAll('#abd .pl2').forEach(e=>e.onclick=()=>openPol(+e.dataset.p));
+}
+function anaMatrix(R){
+  const el=document.getElementById('amx');const W=el.clientWidth||520,H=330,m={t:14,r:14,b:34,l:44};
+  const tot=R.reduce((s,r)=>s+r.vm,0)||1;const by={};for(const r of R)(by[r.pol+'|'+r.ind]=by[r.pol+'|'+r.ind]||[]).push(r);
+  const pts=Object.entries(by).map(([k,a])=>{const o=agg(a);const [p,i]=k.split('|').map(Number);return {p,i,sh:o.vm/tot,y:perf(o),n:o.muns.size,gap:o.vm-o.va,o}}).filter(d=>d.y!=null&&d.sh>0);
+  const xm=d3.max(pts,d=>d.sh)||1;const x=d3.scaleSqrt([0,xm],[m.l,W-m.r]),y=d3.scaleLinear([0,Math.max(1,d3.max(pts,d=>d.y)||1)],[H-m.b,m.t]),rr=d3.scaleSqrt([0,d3.max(pts,d=>d.n)||1],[3,16]);
+  const xt=0.02,yt=an.lim;
+  const svg=d3.select(el).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%').attr('height',H);
+  svg.append('rect').attr('x',x(xt)).attr('y',y(yt)).attr('width',Math.max(0,W-m.r-x(xt))).attr('height',Math.max(0,H-m.b-y(yt))).attr('fill','rgba(244,63,94,.10)').attr('stroke','rgba(244,63,94,.35)').attr('stroke-dasharray','4 3').attr('rx',8);
+  svg.append('text').attr('x',W-m.r-8).attr('y',y(yt)+14).attr('text-anchor','end').style('fill','#FB7185').attr('font-size',10).attr('font-weight',700).text('PRIORIDADE: muito recurso, baixo desempenho');
+  svg.append('g').attr('transform',`translate(0,${H-m.b})`).call(d3.axisBottom(x).tickValues([.005,.02,.05,.1,.2].filter(v=>v<=xm)).tickFormat(d=>(d*100)+'%')).call(g=>{g.selectAll('text').style('fill','var(--mut)');g.selectAll('line,path').style('stroke','var(--softb)')});
+  svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d=>Math.round(d*100)+'%')).call(g=>{g.selectAll('text').style('fill','var(--mut)');g.selectAll('line,path').style('stroke','var(--softb)')});
+  svg.append('text').attr('x',W/2).attr('y',H-4).attr('text-anchor','middle').style('fill','var(--mut)').attr('font-size',10).text('participação no recurso total (escala raiz)');
+  const tip=document.getElementById('tip');
+  svg.selectAll('circle.b').data(pts.sort((a,b)=>b.n-a.n)).join('circle').attr('class','b').attr('cx',d=>x(d.sh)).attr('cy',d=>y(d.y)).attr('fill',d=>pctCol(d.y)).attr('fill-opacity',.75).attr('stroke','var(--bg1)').style('cursor','pointer')
+   .attr('r',0).transition().delay((d,i)=>i*12).duration(500).attr('r',d=>rr(d.n));
+  svg.selectAll('circle.b').on('mousemove',(e,d)=>{tip.innerHTML=`<b>${esc(MO.inds[d.i].nome)}</b><br><span class="s">${esc(MO.pols[d.p].nome)}</span><br>${pc(d.sh)} do recurso · ${pc(d.y)} ${ps.metric==='valor'?'apurado':'atingiram'}<br>não apurado: <b>${ab(d.gap)}</b> · ${d.n} municípios`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1})
+   .on('mouseleave',()=>tip.style.opacity=0).on('click',(e,d)=>{tip.style.opacity=0;openPol(d.p);ps.ind=String(d.i);polView()});
+}
+function anaFragil(R){
+  document.querySelectorAll('#alv button').forEach(b=>b.classList.toggle('on',b.dataset.k===an.lvl));
+  const i=LV[an.lvl];const reg={};
+  for(const r of R){const k=M(r.c)[i];if(!k||k==='—')continue;const g=(reg[k]=reg[k]||{R:[],mun:{},pol:{}});g.R.push(r);(g.mun[r.c]=g.mun[r.c]||{vm:0,va:0});g.mun[r.c].vm+=r.vm;g.mun[r.c].va+=vaOf(r);(g.pol[r.pol]=g.pol[r.pol]||{vm:0,va:0,at:0,na:0});g.pol[r.pol].vm+=r.vm;g.pol[r.pol].va+=vaOf(r);if(r.st===0)g.pol[r.pol].at++;else if(r.st===1)g.pol[r.pol].na++}
+  const rows=Object.entries(reg).map(([k,g])=>{const o=agg(g.R);const ms=Object.values(g.mun).filter(x=>x.vm);const crit=ms.filter(x=>x.va/x.vm<an.lim).length;
+    const pols=Object.entries(g.pol).map(([p,x])=>({p:+p,v:cellPerf(x)})).filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);
+    return {k,o,p:perf(o),gap:o.vm-o.va,crit,nm:ms.length,below:pols.filter(x=>x.v<an.lim).length,np:pols.length,worst:pols.slice(0,3)}}).sort((a,b)=>(a.p??2)-(b.p??2));
+  const fr={};rows.forEach(x=>fr[x.k]=x);
+  // mapa
+  const el=document.getElementById('amap');el.innerHTML='';const W=el.clientWidth||420,H=420;const topo=D['topo_'+an.lvl];const fc=topojson.feature(topo,topo.objects[Object.keys(topo.objects)[0]]);
+  const path=d3.geoPath(d3.geoMercator().fitSize([W,H],fc));const svg=d3.select(el).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%').attr('height',H);const tip=document.getElementById('tip');
+  svg.selectAll('path').data(fc.features).join('path').attr('d',path).attr('stroke',css('--mstroke')).attr('stroke-width',1)
+   .attr('fill',f=>{const x=fr[f.properties[an.lvl]];return x&&x.p!=null?pctCol(x.p):css('--mnull')}).style('opacity',0).transition().delay((f,i)=>i*20).duration(400).style('opacity',1);
+  svg.selectAll('path').on('mousemove',(e,f)=>{const x=fr[f.properties[an.lvl]];tip.innerHTML=`<b>${esc(f.properties[an.lvl])}</b><br>${x?`${pc(x.p)} · ${x.crit}/${x.nm} municípios críticos<br>não apurado ${ab(x.gap)}`:'sem dados'}`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1}).on('mouseleave',()=>tip.style.opacity=0);
+  document.getElementById('afr').innerHTML=`<table class="tb"><thead><tr><th>#</th><th>${LVN[an.lvl]}</th><th style="text-align:right">Desempenho</th><th style="text-align:right">Municípios críticos</th><th style="text-align:right">Políticas abaixo</th><th style="text-align:right">Não apurado</th><th>Piores políticas</th></tr></thead><tbody>${rows.map((x,j)=>`<tr style="cursor:default"><td class="muted">${j+1}</td><td style="font-weight:600;color:var(--strong)">${esc(x.k)}</td><td style="text-align:right"><b style="color:${pctCol(x.p)}">${pc(x.p)}</b></td><td style="text-align:right">${x.crit}<span class="muted">/${x.nm}</span></td><td style="text-align:right">${x.below}<span class="muted">/${x.np}</span></td><td style="text-align:right;white-space:nowrap">${ab(x.gap)}</td><td style="font-size:10.5px;max-width:280px">${x.worst.map(w=>`<div class="ell"><b style="color:${pctCol(w.v)}">${pc(w.v)}</b> ${esc(MO.pols[w.p].nome)}</div>`).join('')}</td></tr>`).join('')}</tbody></table>`;
+}
+function anaDisp(R){
+  const by={};for(const r of R){const k=M(r.c)[3];if(!k||k==='—')continue;const p=(by[r.pol]=by[r.pol]||{all:{vm:0,va:0,at:0,na:0},reg:{}});const g=(p.reg[k]=p.reg[k]||{vm:0,va:0,at:0,na:0});
+    for(const o of [g,p.all]){o.vm+=r.vm;o.va+=vaOf(r);if(r.st===0)o.at++;else if(r.st===1)o.na++}}
+  const rows=Object.entries(by).map(([p,x])=>{const regs=Object.entries(x.reg).map(([k,o])=>({k,v:cellPerf(o)})).filter(z=>z.v!=null);if(regs.length<2)return null;regs.sort((a,b)=>a.v-b.v);
+    return {p:+p,min:regs[0],max:regs[regs.length-1],mg:cellPerf(x.all),amp:regs[regs.length-1].v-regs[0].v}}).filter(Boolean).sort((a,b)=>b.amp-a.amp);
+  const sc=v=>Math.min(1,Math.max(0,v))*100;
+  document.getElementById('adis').innerHTML=rows.map((x,j)=>`<div class="pl2" data-p="${x.p}" style="display:grid;grid-template-columns:minmax(160px,1.2fr) 2fr 170px;gap:12px;align-items:center;padding:6px 0;border-top:1px solid var(--softb);cursor:pointer">
+   <span class="ell" style="font-size:11.5px;font-weight:600;color:var(--strong)" title="${esc(MO.pols[x.p].nome)}">${esc(MO.pols[x.p].nome)}</span>
+   <div style="position:relative;height:18px"><div style="position:absolute;left:0;right:0;top:8px;height:2px;background:var(--track)"></div>
+    <div style="position:absolute;left:${sc(x.min.v)}%;width:${sc(x.max.v)-sc(x.min.v)}%;top:7px;height:4px;background:linear-gradient(90deg,#E11D48,#10B981);border-radius:9px;transform-origin:left;animation:grow .9s ${j*40}ms both"></div>
+    <span title="${esc(x.min.k)}: ${pc(x.min.v)}" style="position:absolute;left:calc(${sc(x.min.v)}% - 6px);top:3px;width:12px;height:12px;border-radius:50%;background:#E11D48"></span>
+    <span title="${esc(x.max.k)}: ${pc(x.max.v)}" style="position:absolute;left:calc(${sc(x.max.v)}% - 6px);top:3px;width:12px;height:12px;border-radius:50%;background:#10B981"></span>
+    ${x.mg!=null?`<span title="Minas Gerais: ${pc(x.mg)}" style="position:absolute;left:calc(${sc(x.mg)}% - 1px);top:0;width:2px;height:18px;background:var(--strong)"></span>`:''}</div>
+   <div style="text-align:right;font-size:11px"><b>${Math.round(x.amp*100)} p.p.</b><div class="s ell" style="margin:0" title="pior: ${esc(x.min.k)} (${pc(x.min.v)}) · melhor: ${esc(x.max.k)} (${pc(x.max.v)})">${x.amp<0.005?'sem diferença entre macros':`<span style="color:#FB7185">pior:</span> ${esc(x.min.k)}`}</div></div></div>`).join('')+`<div class="s" style="margin-top:6px">p.p. = pontos percentuais entre a pior e a melhor macrorregião. Passe o mouse nos pontos para ver as regiões.</div>`;
+  document.querySelectorAll('#adis .pl2').forEach(e=>e.onclick=()=>openPol(+e.dataset.p));
+}
+function anaPri(R,exp){
+  const by={};for(const r of R){if(r.c==='0')continue;const k=r.c+'|'+r.pol;(by[k]=by[k]||[]).push(r)}
+  let rows=Object.entries(by).map(([k,a])=>{const [c,p]=k.split('|');const o=agg(a);const below=new Set(a.filter(r=>r.vm&&vaOf(r)/r.vm<an.lim).map(r=>r.ind));return {c,p:+p,o,v:perf(o),gap:o.vm-o.va,below,rec:o.rec,def:o.def}}).filter(x=>x.v!=null&&x.v<an.lim);
+  if(an.urs)rows=rows.filter(x=>M(x.c)[1]===an.urs);const q=(an.pq||'').toLowerCase();if(q)rows=rows.filter(x=>M(x.c)[0].toLowerCase().includes(q));
+  rows.sort((a,b)=>b.gap-a.gap);
+  if(exp){csvDownload(`prioridades_intervencao_${new Date().toISOString().slice(0,10)}.csv`,[['Município','URS','Microrregião','Macrorregião','Política','Nº Resolução','Bloco','Desempenho (%)','Medida','Momento','Valor da Meta (R$)','Valor apurado (R$)','Não apurado (R$)','Indicadores abaixo do limiar','Recursos às CMA','Deferidos'],
+    ...rows.map(x=>{const m=M(x.c),P=MO.pols[x.p];return [m[0],m[1],m[2],m[3],P.nome,P.res,P.bloco,brl2(x.v*100),ps.metric==='valor'?'% recurso apurado':'status no sistema',ps.mom==='depois'?'depois da CMA':'antes da CMA',brl2(x.o.vm),brl2(x.o.va),brl2(x.gap),[...x.below].map(i=>MO.inds[i].nome).join(' | '),x.rec,x.def]})]);return}
+  document.getElementById('apri').innerHTML=`<div class="s" style="margin-bottom:6px">${n0.format(rows.length)} combinações município × política abaixo de ${an.lim*100}% · ordenadas pelo valor não apurado</div>
+  <table class="tb"><thead><tr><th>Município</th><th>Política</th><th style="text-align:right">Desempenho</th><th style="text-align:right">Não apurado</th><th>Indicadores abaixo do limiar</th><th style="text-align:center">Recurso</th></tr></thead><tbody>${rows.slice(0,300).map(x=>`<tr class="pr" data-c="${x.c}"><td><div style="font-weight:600;color:var(--strong)">${esc(M(x.c)[0])}</div><div class="s">URS ${esc(M(x.c)[1])} · ${esc(M(x.c)[3])}</div></td><td style="max-width:260px"><div class="ell">${esc(MO.pols[x.p].nome)}</div><div class="s">Res. ${MO.pols[x.p].res}</div></td><td style="text-align:right"><b style="color:${pctCol(x.v)}">${pc(x.v)}</b></td><td style="text-align:right;white-space:nowrap"><b>${ab(x.gap)}</b><div class="s">de ${ab(x.o.vm)}</div></td><td style="font-size:10.5px;max-width:320px">${[...x.below].slice(0,3).map(i=>`<div class="ell">• ${esc(MO.inds[i].nome)}</div>`).join('')}${x.below.size>3?`<div class="s">+${x.below.size-3}</div>`:''}</td><td style="text-align:center">${x.rec?`<span class="tag ${x.def?'tag3':'tag2'}" style="font-size:9px">${x.def?x.def+' deferido(s)':x.rec+' recurso(s)'}</span>`:''}</td></tr>`).join('')}</tbody></table>${rows.length>300?`<div class="s">Mostrando 300 de ${n0.format(rows.length)} — baixe a planilha para ver todas.</div>`:''}`;
+  document.querySelectorAll('#apri .pr').forEach(e=>e.onclick=()=>openMun(e.dataset.c));
 }
 
 const sel=document.getElementById('busca');

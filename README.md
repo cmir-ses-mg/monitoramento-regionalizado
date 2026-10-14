@@ -26,6 +26,16 @@ Para atualizar na hora, use a aba **Actions › Atualizar painel › Run workflo
   - **% do recurso apurado** = soma do *Valor Apurado* ÷ soma do *Valor da Meta*. É o padrão.
   - **Status no sistema** = unidades com *Status Cumprimento* "Atingiu" ÷ (Atingiu + Não Atingiu).
 
+## Análise para intervenção (aba Análise)
+
+- **Antes × depois da CMA:**
+  - *antes* = Valor Apurado na coleta;
+  - *depois* = aplica a **Correção da Parcela CMA** dos recursos deliberados, limitada ao Valor da Meta. O botão "Momento" troca entre os dois em todo o painel.
+- **Matriz de priorização:** cada indicador posicionado pela participação no recurso total × desempenho. O quadrante vermelho reúne os indicadores com muito recurso e baixo desempenho.
+- **Regiões mais frágeis:** macro, URS ou micro ordenadas pelo desempenho, com municípios críticos (abaixo do limiar), políticas abaixo do limiar, valor não apurado e as piores políticas.
+- **Disparidades:** amplitude, em pontos percentuais, entre a melhor e a pior macrorregião em cada política.
+- **Lista de prioridades:** município × política abaixo do limiar, ordenada pelo valor não apurado. Pode ser baixada em CSV para os planos de intervenção.
+
 ## Configuração (uma vez)
 
 1. **Settings › Pages › Source: GitHub Actions.**
