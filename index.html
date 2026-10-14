@@ -115,6 +115,7 @@ details.rc{border-bottom:1px solid var(--softb);padding:8px 0}details.rc summary
 .pcard .plist{margin-top:8px;flex:1;min-height:0;overflow-y:auto;padding-right:6px;scrollbar-width:thin}
 .pcard .plist::-webkit-scrollbar{width:6px}.pcard .plist::-webkit-scrollbar-thumb{background:var(--softb);border-radius:9px}
 @media(max-width:640px){.pgrid{grid-template-columns:1fr}.pcard{height:340px}}
+.sbox{max-height:440px;overflow-y:auto;padding:4px 6px 4px 2px;scrollbar-width:thin}.sbox::-webkit-scrollbar{width:6px}.sbox::-webkit-scrollbar-thumb{background:var(--softb);border-radius:9px}
 </style></head><body>
 <div class="wrap">
 <header>
@@ -190,10 +191,10 @@ function geral(){
    </div>
    <div class="g card feed a" style="animation-delay:340ms"><div class="ct"><span class="k">Últimos pagamentos</span><span class="dot"></span></div><div id="feed"></div></div>
   </div>
-  <div class="ct" style="margin-top:18px"><span class="k">Municípios ${st.sel?'· '+title():''} — clique para abrir</span></div>
-  <div class="muns" id="muns"></div>
+  <div class="ct" style="margin-top:18px"><span class="k">Municípios ${st.sel?'· '+title():''} — clique para abrir</span><span class="s" id="munn" style="margin:0"></span></div>
+  <div class="muns sbox" id="muns"></div>
   <div class="ct" style="margin-top:18px"><span class="k">Consórcios e entidades ${st.sel?'· '+title():''} — clique para abrir</span><span class="s" id="entn" style="margin:0"></span></div>
-  <div class="muns" id="ents"></div>`;
+  <div class="muns sbox" id="ents"></div>`;
   bindNav();
   document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{st.level=b.dataset.k;st.sel=null;geral()});
   document.querySelectorAll('#tseg button').forEach(b=>b.onclick=()=>{st.tipo=+b.dataset.t;geral()});
@@ -252,18 +253,19 @@ function feed(R){
 }
 function munCards(R){
   const by={};for(const r of R){if(r.c==='0'||r.tb>0)continue;(by[r.c]=by[r.c]||{v:0,n:0,u:''});by[r.c].v+=r.v;by[r.c].n++;if(r.d>by[r.c].u)by[r.c].u=r.d}
-  const t=Object.entries(by).sort((a,b)=>b[1].v-a[1].v).slice(0,24);
+  const t=Object.entries(by).sort((a,b)=>az(M(a[0])[0],M(b[0])[0]));
+  const mn=document.getElementById('munn');if(mn)mn.textContent=t.length?`${t.length} municípios · ${ab(t.reduce((s,x)=>s+x[1].v,0))} · role para ver todos`:'';
   const el=document.getElementById('muns');
-  el.innerHTML=t.map(([c,o],i)=>`<div class="g mc a" data-c="${c}" style="animation-delay:${i*35}ms"><div class="ell" style="font-weight:700;font-size:13px">${M(c)[0]}</div><div class="s ell">URS ${M(c)[1]}</div><div class="row" style="justify-content:space-between;margin-top:6px"><b class="acc" style="white-space:nowrap">${ab(o.v)}</b><span class="s" style="margin:0">${o.n} pgtos · ${dt(o.u).slice(0,5)}</span></div></div>`).join('');
+  el.innerHTML=t.map(([c,o],i)=>`<div class="g mc a" data-c="${c}" style="animation-delay:${Math.min(i,24)*35}ms"><div class="ell" style="font-weight:700;font-size:13px">${M(c)[0]}</div><div class="s ell">URS ${M(c)[1]}</div><div class="row" style="justify-content:space-between;margin-top:6px"><b class="acc" style="white-space:nowrap">${ab(o.v)}</b><span class="s" style="margin:0">${o.n} pgtos · ${dt(o.u).slice(0,5)}</span></div></div>`).join('');
   el.querySelectorAll('.mc').forEach(e=>e.onclick=()=>openMun(e.dataset.c));
   if(!t.length)el.innerHTML='<div class="s">Nenhum município neste filtro.</div>';
 }
 function entCards(R){
   const by={};for(const r of R){if(!r.tb)continue;(by[r.b]=by[r.b]||{v:0,n:0,u:'',c:r.c,tb:r.tb});by[r.b].v+=r.v;by[r.b].n++;if(r.d>by[r.b].u)by[r.b].u=r.d}
-  const all=Object.entries(by).sort((a,b)=>b[1].v-a[1].v),t=all.slice(0,24);
-  document.getElementById('entn').textContent=all.length?`${all.length} beneficiários · ${ab(all.reduce((s,x)=>s+x[1].v,0))}`:'';
+  const all=Object.entries(by).sort((a,b)=>az(D.bens[a[0]],D.bens[b[0]])),t=all;
+  document.getElementById('entn').textContent=all.length?`${all.length} beneficiários · ${ab(all.reduce((s,x)=>s+x[1].v,0))} · role para ver todos`:'';
   const el=document.getElementById('ents');
-  el.innerHTML=t.length?t.map(([b,o],i)=>`<div class="g mc a" data-c="${o.c}" data-b="${b}" style="animation-delay:${i*35}ms"><span class="tag ${o.tb===1?'tag2':''}" style="font-size:9px;padding:0 7px">${o.tb===1?'Consórcio':'Entidade'}</span><div class="ell" style="font-weight:700;font-size:12.5px;margin-top:5px" title="${D.bens[b]}">${D.bens[b]}</div><div class="s ell">${o.c==='0'?'sem município no BO':M(o.c)[0]+' · URS '+M(o.c)[1]}</div><div class="row" style="justify-content:space-between;margin-top:6px"><b class="acc" style="white-space:nowrap">${ab(o.v)}</b><span class="s" style="margin:0">${o.n} pgtos · ${dt(o.u).slice(0,5)}</span></div></div>`).join(''):'<div class="s">Nenhum consórcio ou entidade neste filtro.</div>';
+  el.innerHTML=t.length?t.map(([b,o],i)=>`<div class="g mc a" data-c="${o.c}" data-b="${b}" style="animation-delay:${Math.min(i,24)*35}ms"><span class="tag ${o.tb===1?'tag2':''}" style="font-size:9px;padding:0 7px">${o.tb===1?'Consórcio':'Entidade'}</span><div class="ell" style="font-weight:700;font-size:12.5px;margin-top:5px" title="${D.bens[b]}">${D.bens[b]}</div><div class="s ell">${o.c==='0'?'sem município no BO':M(o.c)[0]+' · URS '+M(o.c)[1]}</div><div class="row" style="justify-content:space-between;margin-top:6px"><b class="acc" style="white-space:nowrap">${ab(o.v)}</b><span class="s" style="margin:0">${o.n} pgtos · ${dt(o.u).slice(0,5)}</span></div></div>`).join(''):'<div class="s">Nenhum consórcio ou entidade neste filtro.</div>';
   el.querySelectorAll('.mc').forEach(e=>e.onclick=()=>openMun(e.dataset.c,e.dataset.b));
 }
 // ---------- MUNICÍPIO
