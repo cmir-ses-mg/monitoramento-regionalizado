@@ -99,6 +99,16 @@ details.rc{border-bottom:1px solid var(--softb);padding:8px 0}details.rc summary
 .pc:hover{transform:translateY(-3px)}input::placeholder{color:var(--mut2)}
 @media(max-width:640px){.kpis{grid-template-columns:1fr!important}.wrap{padding:14px 14px 24px}h1{font-size:20px}.seg button{padding:5px 9px}.flt select{min-width:0!important;width:100%}}
 @media(max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.main,.mgrid{grid-template-columns:1fr}.sticky{position:static}}
+#mdl .mbg{position:fixed;inset:0;background:rgba(2,6,23,.55);backdrop-filter:blur(4px);z-index:90}
+#mdl .mwrap{position:fixed;inset:0;z-index:91;display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow:auto}
+#mdl .mbox{width:min(980px,100%);padding:18px 20px;max-height:none}
+#mdl .x{background:var(--soft);border:1px solid var(--softb);color:var(--txt);border-radius:10px;width:34px;height:34px;cursor:pointer;font-size:15px;flex:none}
+#mdl .tb tr[data-op]:hover,#mdl .tb tr[data-om]:hover{background:var(--sel)}
+#mdl .tb{font-size:12px}
+.clk{cursor:pointer;transition:transform .2s,box-shadow .2s}.clk:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(16,185,129,.18)}
+.clk::after{content:'detalhar ›';position:absolute;right:12px;bottom:8px;font-size:10px;color:var(--mut);opacity:.7}
+.clk{position:relative}
+@media(max-width:640px){#mdl .mbox{padding:14px 12px}#mdl .tb{font-size:11px}}
 </style></head><body>
 <div class="wrap">
 <header>
@@ -357,12 +367,34 @@ const vaOf=r=>(ps.mom==='depois'&&r.del>=0&&r.corr!=null&&r.vm>0)?Math.min(r.cor
 function agg(R){const o={n:R.length,at:0,na:0,ni:0,vm:0,va:0,rec:0,def:0,ind:0,muns:new Set(),inds:new Set()};
   for(const r of R){o[['at','na','ni'][r.st]]++;o.vm+=r.vm;o.va+=vaOf(r);if(r.rec)o.rec++;if(r.del===1)o.def++;if(r.del===0)o.ind++;o.muns.add(r.c);o.inds.add(r.ind)}
   o.pct=(o.at+o.na)?o.at/(o.at+o.na):null;o.pv=o.vm?o.va/o.vm:null;return o}
+const PROGIDX={};(D.progs||[]).forEach((p,i)=>PROGIDX[p.trim()]=i);
+const PAY={};if(MO)MO.pols.forEach((P,pi)=>{const ids=new Set((P.upgs||[]).map(u=>PROGIDX[u.trim()]).filter(x=>x!=null));if(!ids.size)return;const o=PAY[pi]={};for(const r of ROWS)if(ids.has(r.p))o[r.c]=(o[r.c]||0)+r.v});
+function pagoDe(R){const seen=new Set();let t=0;for(const r of R){const k=r.pol+'|'+r.c;if(seen.has(k))continue;seen.add(k);t+=(PAY[r.pol]&&PAY[r.pol][r.c])||0}return t}
+const temPag=R=>R.some(r=>PAY[r.pol]);
+const CONF={alta:'',media:' (ligação a confirmar)','a confirmar':' (ligação a confirmar)'};
+function modal(title,sub,html){let m=document.getElementById('mdl');if(!m){m=document.createElement('div');m.id='mdl';document.body.appendChild(m);document.addEventListener('keydown',e=>{if(e.key==='Escape')m.innerHTML=''})}
+  m.innerHTML=`<div class="mbg"></div><div class="mwrap"><div class="g mbox a"><div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px"><div><div class="grad" style="font-size:20px;font-weight:800">${title}</div><div class="s" style="font-size:12px">${sub||''}</div></div><button class="x" id="mx" title="Fechar">✕</button></div><div style="margin-top:12px">${html}</div></div></div>`;
+  m.querySelector('.mbg').onclick=()=>m.innerHTML='';m.querySelector('.mwrap').onclick=e=>{if(e.target.classList.contains('mwrap'))m.innerHTML=''};document.getElementById('mx').onclick=()=>m.innerHTML='';
+  m.querySelectorAll('[data-op]').forEach(e=>e.onclick=()=>{m.innerHTML='';openPol(+e.dataset.op)});m.querySelectorAll('[data-om]').forEach(e=>e.onclick=()=>{m.innerHTML='';openMun(e.dataset.om)})}
+const COMO='<div class="s" style="margin:0 0 10px;padding:8px 12px;border-radius:12px;background:var(--soft);border:1px solid var(--softb)">';
+function grpTab(R,keyFn,labelFn,opts={}){const by={};for(const r of R){const k=keyFn(r);if(k==null)continue;(by[k]=by[k]||[]).push(r)}
+  let rows=Object.entries(by).map(([k,a])=>({k,a,o:agg(a),pg:pagoDe(a)}));rows.sort(opts.sort||((x,y)=>(x.o.pv??2)-(y.o.pv??2)));
+  const pg=temPag(R);
+  return `<div style="overflow-x:auto"><table class="tb"><thead><tr><th>${opts.col||''}</th><th style="text-align:right">Valor previsto</th><th style="text-align:right">Apurado</th>${pg?'<th style="text-align:right">Pago em 2026 (BO)</th>':''}<th style="text-align:right">Atingiu / não / sem info</th><th style="text-align:right">Pedidos de recurso</th></tr></thead><tbody>${rows.slice(0,opts.max||500).map(x=>`<tr ${opts.attr?opts.attr(x.k):''}><td>${labelFn(x.k,x)}</td><td style="text-align:right;white-space:nowrap">${ab(x.o.vm)}</td><td style="text-align:right;white-space:nowrap"><b style="color:${pctCol(x.o.pv)}">${pc(x.o.pv)}</b><div class="s">${ab(x.o.va)}</div></td>${pg?`<td style="text-align:right;white-space:nowrap">${x.pg?ab(x.pg):'—'}</td>`:''}<td style="text-align:right;white-space:nowrap"><span style="color:${STC[0]}">${x.o.at}</span> / <span style="color:${STC[1]}">${x.o.na}</span> / <span class="muted">${x.o.ni}</span></td><td style="text-align:right;white-space:nowrap">${x.o.rec?`${x.o.rec} <span class="s">(${x.o.def} deferidos · ${x.o.ind} indeferidos${x.o.rec-x.o.def-x.o.ind?` · ${x.o.rec-x.o.def-x.o.ind} aguardando`:''})</span>`:'—'}</td></tr>`).join('')}</tbody></table></div>${rows.length>(opts.max||500)?`<div class="s">Mostrando ${opts.max||500} de ${rows.length}.</div>`:''}`}
+const tabPol=R=>grpTab(R,r=>r.pol,(k)=>`<b class="strong">${esc(MO.pols[k].nome)}</b><div class="s">Res. ${MO.pols[k].res}</div>`,{col:'Política',attr:k=>`data-op="${k}" style="cursor:pointer"`});
+const tabMun=(R,max)=>grpTab(R,r=>r.c==='0'?null:r.c,(k)=>`<b class="strong">${esc(M(k)[0])}</b><div class="s">URS ${esc(M(k)[1])} · ${esc(M(k)[3])}</div>`,{col:'Município',attr:k=>`data-om="${k}" style="cursor:pointer"`,max:max||400});
+const tabURS=R=>grpTab(R,r=>{const u=M(r.c)[1];return u&&u!=='—'?u:null},(k)=>`<b class="strong">URS ${esc(k)}</b>`,{col:'Unidade Regional'});
+const tabInd=R=>grpTab(R,r=>r.ind,(k)=>`<b class="strong">${esc(MO.inds[k].nome)}</b><div class="s">${esc(MO.inds[k].fonte)}</div>`,{col:'Indicador'});
+function tabRec(R){const rr=R.filter(r=>r.rec);if(!rr.length)return '<div class="s">Nenhum pedido de recurso neste recorte.</div>';
+  const def=rr.filter(r=>r.del===1).length,ind=rr.filter(r=>r.del===0).length,pend=rr.length-def-ind;
+  return COMO+`<b>${n0.format(rr.length)} pedidos</b> = <span class="up">${def} deferidos</span> + <span class="dn">${ind} indeferidos</span> + ${pend} aguardando decisão da CMA.</div>`+grpTab(rr,r=>r.pol,(k)=>`<b class="strong">${esc(MO.pols[k].nome)}</b>`,{col:'Política',attr:k=>`data-op="${k}" style="cursor:pointer"`,sort:(x,y)=>y.o.rec-x.o.rec})}
+function bindKpis(map){document.querySelectorAll('[data-kpi]').forEach(e=>{const f=map[e.dataset.kpi];if(!f)return;e.classList.add('clk');e.title='Clique para ver o detalhamento';e.onclick=f})}
 const regKey=(lvl,c)=>lvl==='mun'?c:M(c)[LV[lvl]];
 let ps={mom:'depois',metric:'valor',bloco:'',sub:'',q:'',reg:'',hm:'macro',pol:null,per:'',ind:'',lvl:'macro',sel:null,mq:'',open:null};
 const perf=o=>ps.metric==='valor'?o.pv:o.pct;
-const MLBL=()=>ps.metric==='valor'?'recurso apurado':'metas atingidas (status)';
+const MLBL=()=>ps.metric==='valor'?'valor apurado':'metas atingidas (situação no sistema)';
 function cellPerf(x){return ps.metric==='valor'?(x.vm?x.va/x.vm:null):((x.at+x.na)?x.at/(x.at+x.na):null)}
-function metricSeg(){return `<span class="k">Momento</span><div class="seg" id="fmom"><button data-m="antes" class="${ps.mom==='antes'?'on':''}" title="Valor Apurado na coleta">Antes da CMA</button><button data-m="depois" class="${ps.mom==='depois'?'on':''}" title="Aplica a Correção da Parcela CMA dos recursos deliberados">Depois da CMA</button></div><span class="k">Medir por</span><div class="seg" id="fmet"><button data-m="valor" class="${ps.metric==='valor'?'on':''}" title="Valor Apurado ÷ Valor da Meta">% do recurso apurado</button><button data-m="status" class="${ps.metric==='status'?'on':''}" title="Coluna Status Cumprimento">Status no sistema</button></div>`}
+function metricSeg(){return `<span class="k">Quando</span><div class="seg" id="fmom"><button data-m="antes" class="${ps.mom==='antes'?'on':''}" title="Resultado da coleta de dados, antes de a CMA analisar os pedidos de recurso">Antes da CMA</button><button data-m="depois" class="${ps.mom==='depois'?'on':''}" title="Resultado final, já com as correções aprovadas pela CMA">Depois da CMA</button></div><span class="k">Medir pelo</span><div class="seg" id="fmet"><button data-m="valor" class="${ps.metric==='valor'?'on':''}" title="Quanto do valor previsto foi apurado com o resultado">% do valor apurado</button><button data-m="status" class="${ps.metric==='status'?'on':''}" title="Campo 'Status Cumprimento' do sistema">Situação no sistema</button></div>`}
 function bindMetric(fn){document.querySelectorAll('#fmom button').forEach(b=>b.onclick=()=>{ps.mom=b.dataset.m;fn()});document.querySelectorAll('#fmet button').forEach(b=>b.onclick=()=>{ps.metric=b.dataset.m;fn()})}
 function regFilter(R){if(!ps.reg)return R;const [l,v]=ps.reg.split('|');return R.filter(r=>M(r.c)[LV[l]]===v)}
 function ring(p,size=58){const v=p==null?0:Math.min(1,p);return `<div style="width:${size}px;height:${size}px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(${pctCol(p)} ${v*360}deg,var(--track) 0);animation:up .6s both"><div style="width:${size-12}px;height:${size-12}px;border-radius:50%;background:var(--bg1);display:grid;place-items:center;font-size:${size>50?12:10}px;font-weight:800;color:var(--strong)">${p==null?'—':Math.round(p*100)+'%'}</div></div>`}
@@ -387,11 +419,11 @@ function polsView(){
   const regName=ps.reg?(ps.reg.startsWith('urs')?'URS ':'Macro ')+ps.reg.split('|')[1]:'Minas Gerais';
   app.innerHTML=navBar()+`
   <div class="kpis">
-   <div class="g kpi a"><div class="k">Políticas monitoradas · ${esc(regName)}</div><div class="v grad" style="font-size:30px">${pols.length}</div><div class="s">${tot.inds.size} indicadores · ${n0.format(tot.n)} unidades monitoradas</div></div>
-   <div class="g kpi a" style="animation-delay:90ms"><div class="k">Municípios monitorados</div><div class="v">${n0.format([...tot.muns].filter(c=>c!=='0').length)}</div><div class="s">em ao menos uma política</div></div>
-   <div class="g kpi a" style="animation-delay:180ms"><div class="k">Recurso apurado nas metas</div><div class="v" style="color:${pctCol(tot.pv)}">${pc(tot.pv)}</div><div class="s">${ab(tot.va)} de ${ab(tot.vm)} vinculados às metas</div></div>
-   <div class="g kpi a" style="animation-delay:270ms"><div class="k">Status no sistema</div><div class="v">${pc(tot.pct)}</div><div class="s">${n0.format(tot.at)} atingiram · ${n0.format(tot.na)} não · ${n0.format(tot.ni)} sem informação</div></div>
-   <div class="g kpi a warn" style="animation-delay:360ms"><div class="k">Recursos às CMA</div><div class="v">${n0.format(tot.rec)}</div><div class="s">${n0.format(tot.def)} deferidos · ${n0.format(tot.ind)} indeferidos</div></div>
+   <div class="g kpi a" data-kpi="pol"><div class="k">Políticas monitoradas · ${esc(regName)}</div><div class="v grad" style="font-size:30px">${pols.length}</div><div class="s">${tot.inds.size} indicadores · ${n0.format(tot.n)} itens avaliados</div></div>
+   <div class="g kpi a" data-kpi="mun" style="animation-delay:90ms"><div class="k">Municípios avaliados</div><div class="v">${n0.format([...tot.muns].filter(c=>c!=='0').length)}</div><div class="s">em pelo menos uma política</div></div>
+   <div class="g kpi a" data-kpi="val" style="animation-delay:180ms"><div class="k">Valor apurado</div><div class="v" style="color:${pctCol(tot.pv)}">${pc(tot.pv)}</div><div class="s">${ab(tot.va)} de ${ab(tot.vm)} previstos</div></div>
+   <div class="g kpi a" data-kpi="sit" style="animation-delay:270ms"><div class="k">Metas atingidas (sistema)</div><div class="v">${pc(tot.pct)}</div><div class="s">${n0.format(tot.at)} atingiram · ${n0.format(tot.na)} não · ${n0.format(tot.ni)} sem informação</div></div>
+   <div class="g kpi a warn" data-kpi="rec" style="animation-delay:360ms"><div class="k">Pedidos de recurso às CMA</div><div class="v">${n0.format(tot.rec)}</div><div class="s">${n0.format(tot.def)} deferidos · ${n0.format(tot.ind)} indeferidos · ${n0.format(tot.rec-tot.def-tot.ind)} aguardando</div></div>
   </div>
   <div class="g flt a" style="margin:0 0 14px">
     ${metricSeg()}
@@ -412,9 +444,9 @@ function polsView(){
     <div class="row" style="justify-content:space-between;margin-top:8px;font-size:11px"><span class="s" style="margin:0">Apurado <b class="acc">${ab(x.o.va)}</b> de ${ab(x.o.vm)}</span><span class="s" style="margin:0">${x.o.rec?`${x.o.rec} recurso(s)`:'sem recursos'}</span></div>
    </div>`).join('')||'<div class="s">Nenhuma política neste filtro.</div>'}</div>
   <div class="g card a" style="margin-top:16px">
-   <div class="ct"><span class="k">Comparativo regional · ${MLBL()} por política</span><div class="seg" id="hml">${[['macro','Macrorregiões'],['urs','URS']].map(([k,l])=>`<button data-k="${k}" class="${ps.hm===k?'on':''}">${l}</button>`).join('')}</div></div>
+   <div class="ct"><span class="k">Comparativo regional · ${MLBL()} por política e região</span><div class="seg" id="hml">${[['macro','Macrorregiões'],['urs','URS']].map(([k,l])=>`<button data-k="${k}" class="${ps.hm===k?'on':''}">${l}</button>`).join('')}</div></div>
    <div id="heat" style="overflow:auto"></div>
-   <div class="legend" style="margin-top:8px">0%<i style="background:linear-gradient(90deg,#E11D48,#F59E0B,#FACC15,#10B981)"></i>100% ${ps.metric==='valor'?'do recurso apurado':'das unidades com meta atingida'} · clique numa célula para abrir</div>
+   <div class="legend" style="margin-top:8px">0%<i style="background:linear-gradient(90deg,#E11D48,#F59E0B,#FACC15,#10B981)"></i>100% ${ps.metric==='valor'?'do valor apurado':'dos itens com meta atingida'} · clique numa célula para abrir</div>
   </div>`;
   bindNav();
   bindMetric(polsView);
@@ -423,6 +455,12 @@ function polsView(){
   document.getElementById('freg').onchange=e=>{ps.reg=e.target.value;polsView()};
   const fq=document.getElementById('fq');fq.oninput=()=>{clearTimeout(fq._t);fq._t=setTimeout(()=>{ps.q=fq.value;polsView();const n=document.getElementById('fq');n.focus();n.setSelectionRange(n.value.length,n.value.length)},350)};
   document.querySelectorAll('.pc').forEach(e=>e.onclick=()=>openPol(+e.dataset.i));
+  const RK=R0.filter(r=>pols.some(x=>x.i===r.pol));
+  bindKpis({pol:()=>modal('Políticas monitoradas',esc(regName),COMO+'Cada linha é uma política. <b>Valor previsto</b> é o que os municípios receberiam se cumprissem todas as metas; <b>apurado</b> é o que o resultado assegurou. Clique numa política para abrir.</div>'+tabPol(RK)),
+    mun:()=>modal('Municípios avaliados',esc(regName),COMO+'Ordenados do menor para o maior % do valor apurado. Clique num município para abrir.</div>'+tabMun(RK)),
+    val:()=>modal('Valor apurado',esc(regName)+' · '+(ps.mom==='depois'?'depois da CMA':'antes da CMA'),COMO+'Para cada indicador existe um valor previsto. Conforme o resultado, o município tem apurado parte (ou todo) desse valor. Aqui está quanto foi apurado em cada URS e em cada política.</div><div class="ct"><span class="k">Por Unidade Regional</span></div>'+tabURS(RK)+'<div class="ct" style="margin-top:14px"><span class="k">Por política</span></div>'+tabPol(RK)),
+    sit:()=>modal('Metas atingidas (situação no sistema)',esc(regName),COMO+'Contagem do campo <i>Status Cumprimento</i> do sistema: <b>atingiu</b>, <b>não atingiu</b> e <b>sem informação</b>. A soma dos três é o total de itens avaliados ('+n0.format(tot.n)+').</div>'+tabPol(RK)),
+    rec:()=>modal('Pedidos de recurso às CMA',esc(regName),tabRec(RK))});
   document.querySelectorAll('#hml button').forEach(b=>b.onclick=()=>{ps.hm=b.dataset.k;polsView()});
   heatmap(pols);
 }
@@ -437,16 +475,17 @@ function heatmap(pols){
 }
 
 // ---------- página da política
-function openPol(i,keepSel){st.view='pol';ps.pol=i;ps.per='';ps.ind='';ps.mq='';ps.open=null;if(!keepSel){ps.sel=null;ps.lvl='macro'}window.scrollTo({top:0,behavior:'smooth'});polView()}
+function openPol(i,keepSel){st.view='pol';ps.pol=i;ps.per='';ps.ind='';ps.mq='';ps.open=null;ps.et='';if(!keepSel){ps.sel=null;ps.lvl='macro'}window.scrollTo({top:0,behavior:'smooth'});polView()}
 function polView(){
   const P=MO.pols[ps.pol];let RP=MR.filter(r=>r.pol===ps.pol);
   const pers=[...new Set(RP.map(r=>r.per))].sort((a,b)=>(MO.periodos[a][0]||'').localeCompare(MO.periodos[b][0]||''));
   if(ps.per!=='')RP=RP.filter(r=>r.per===+ps.per);
   const indsAll=[...new Set(RP.map(r=>r.ind))];
   const RI=ps.ind===''?RP:RP.filter(r=>r.ind===+ps.ind);
-  const RS=ps.sel?RI.filter(r=>regKey(ps.lvl,r.c)===ps.sel):RI;
+  const RS0=ps.sel?RI.filter(r=>regKey(ps.lvl,r.c)===ps.sel):RI;
+  const RS=ps.et?RS0.filter(r=>r.et===+ps.et):RS0;
   const o=agg(RS);const fins=[...new Set(RS.map(r=>MO.periodos[r.per][3]))].filter(Boolean).sort();
-  const etapas=[1,2,3].map(e=>RS.filter(r=>r.et>=e).length);
+  const etapas=[1,2,3].map(e=>RS0.filter(r=>r.et===e).length);
   const selName=ps.sel?({macro:'Macro ',micro:'Micro ',urs:'URS ',mun:''}[ps.lvl]+(ps.lvl==='mun'?M(ps.sel)[0]:ps.sel)):'Minas Gerais';
   document.getElementById('app').innerHTML=navBar()+`
   <div class="row" style="margin-bottom:12px"><button class="back" id="bkp">← Todas as políticas</button></div>
@@ -458,15 +497,16 @@ function polView(){
      <div class="s" style="font-size:12px">Resolução SES/MG nº ${P.res.toLocaleString('pt-BR')} · ${esc(P.sub)} · ${esc(P.tipo)}</div>
      <div class="s">Período monitorado: ${pers.map(perLbl).filter((v,i,a)=>a.indexOf(v)===i).join(' · ')} · ${fins.length?'monitoramento finalizado em '+dtl(fins[fins.length-1]):''}</div>
     </div>
-    <div class="row" style="gap:14px">${ring(perf(o),86)}<div><div class="k">${ps.metric==='valor'?'Recurso apurado':'Status no sistema'} · ${esc(selName)}</div><div class="s">${ps.metric==='valor'?`${ab(o.va)} de ${ab(o.vm)}`:`${n0.format(o.at)} de ${n0.format(o.at+o.na)} unidades atingiram`}</div>${ps.metric==='valor'?`<div class="s">Status no sistema: ${pc(o.pct)} atingiram</div>`:`<div class="s">Recurso apurado: ${pc(o.pv)}</div>`}<div style="width:220px;margin-top:6px">${stBar(o)}</div></div></div>
+    <div class="row" style="gap:14px">${ring(perf(o),86)}<div><div class="k">${ps.metric==='valor'?'Valor apurado':'Metas atingidas (sistema)'} · ${esc(selName)}</div><div class="s">${ps.metric==='valor'?`${ab(o.va)} de ${ab(o.vm)} previstos`:`${n0.format(o.at)} de ${n0.format(o.at+o.na)} itens atingiram`}</div>${ps.metric==='valor'?`<div class="s">Metas atingidas (sistema): ${pc(o.pct)}</div>`:`<div class="s">Valor apurado: ${pc(o.pv)}</div>`}<div style="width:220px;margin-top:6px">${stBar(o)}</div></div></div>
    </div>
    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
-    <div class="box a" style="animation-delay:100ms"><div class="k">Municípios</div><div class="v" style="font-size:20px">${n0.format([...o.muns].filter(c=>c!=='0').length)}</div></div>
-    <div class="box a" style="animation-delay:160ms"><div class="k">Unidades monitoradas</div><div class="v" style="font-size:20px">${n0.format(o.n)}</div><div class="s">${o.inds.size} indicador(es)</div></div>
-    <div class="box a" style="animation-delay:220ms"><div class="k">Valor vinculado às metas</div><div class="v" style="font-size:20px">${ab(o.vm)}</div></div>
-    <div class="box a" style="animation-delay:280ms"><div class="k">Valor apurado</div><div class="v acc" style="font-size:20px">${ab(o.va)}</div><div class="s">${pc(o.pv)} do previsto</div></div>
-    <div class="box a warn" style="animation-delay:340ms"><div class="k">Recursos às CMA</div><div class="v" style="font-size:20px">${n0.format(o.rec)}</div><div class="s">${o.def} deferidos · ${o.ind} indeferidos</div></div>
-    <div class="box a" style="animation-delay:400ms"><div class="k">Sem informação</div><div class="v" style="font-size:20px">${n0.format(o.ni)}</div><div class="s">status "Não Informado"</div></div>
+    <div class="box a" data-kpi="mun" style="animation-delay:100ms"><div class="k">Municípios</div><div class="v" style="font-size:20px">${n0.format([...o.muns].filter(c=>c!=='0').length)}</div><div class="s">clique para ver a lista</div></div>
+    <div class="box a" data-kpi="ind" style="animation-delay:160ms"><div class="k">Itens avaliados</div><div class="v" style="font-size:20px">${n0.format(o.n)}</div><div class="s">${o.inds.size} indicador(es) × municípios</div></div>
+    <div class="box a" data-kpi="val" style="animation-delay:220ms"><div class="k">Valor previsto</div><div class="v" style="font-size:20px">${ab(o.vm)}</div><div class="s">se todas as metas fossem cumpridas</div></div>
+    <div class="box a" data-kpi="val" style="animation-delay:280ms"><div class="k">Valor apurado</div><div class="v acc" style="font-size:20px">${ab(o.va)}</div><div class="s">${pc(o.pv)} do previsto</div></div>
+    ${temPag(RS)?`<div class="box a" data-kpi="pag" style="animation-delay:320ms"><div class="k">Pago em 2026 (BO)</div><div class="v" style="font-size:20px">${ab(pagoDe(RS))}</div><div class="s">programa ligado no BO${CONF[P.upg_conf]||''}</div></div>`:''}
+    <div class="box a warn" data-kpi="rec" style="animation-delay:340ms"><div class="k">Pedidos de recurso</div><div class="v" style="font-size:20px">${n0.format(o.rec)}</div><div class="s">${o.def} deferidos · ${o.ind} indeferidos${o.rec-o.def-o.ind?` · ${o.rec-o.def-o.ind} aguardando`:''}</div></div>
+    <div class="box a" data-kpi="si" style="animation-delay:400ms"><div class="k">Sem informação</div><div class="v" style="font-size:20px">${n0.format(o.ni)}</div><div class="s">itens sem resultado informado</div></div>
    </div>
   </div>
   <div class="g flt a" style="animation-delay:120ms">
@@ -476,21 +516,21 @@ function polView(){
    ${ps.sel||ps.ind!==''||ps.per!==''?`<button class="back" id="pclr">✕ limpar filtros</button>`:''}
   </div>
   <div class="main" style="margin-top:14px">
-   <div class="g card a"><div class="ct"><span class="k">${ps.metric==='valor'?'Recurso apurado':'Metas atingidas'} no mapa · clique para filtrar</span><div class="seg" id="plv">${[['macro','Macro'],['micro','Micro'],['urs','Regional'],['mun','Municípios']].map(([k,l])=>`<button data-k="${k}" class="${ps.lvl===k?'on':''}">${l}</button>`).join('')}</div></div>
+   <div class="g card a"><div class="ct"><span class="k">${ps.metric==='valor'?'Valor apurado':'Metas atingidas'} no mapa · clique para filtrar</span><div class="seg" id="plv">${[['macro','Macro'],['micro','Micro'],['urs','Regional'],['mun','Municípios']].map(([k,l])=>`<button data-k="${k}" class="${ps.lvl===k?'on':''}">${l}</button>`).join('')}</div></div>
     <div id="pmap" style="height:400px"></div>
     <div class="ct" style="margin:6px 0 0"><div class="legend">0%<i style="background:linear-gradient(90deg,#E11D48,#F59E0B,#FACC15,#10B981)"></i>100% · cinza = não participa</div>${ps.sel?`<button class="back" id="psclr">✕ ${esc(selName)}</button>`:''}</div></div>
-   <div class="g card a" style="animation-delay:80ms"><div class="ct"><span class="k">Ranking · ${ps.lvl==='mun'||ps.lvl==='micro'?'URS':ps.lvl==='urs'?'URS':'macrorregiões'}</span><span class="s" style="margin:0">${ps.metric==='valor'?'% do recurso apurado':'% de unidades que atingiram'}</span></div><div id="rank" style="max-height:440px;overflow:auto;padding-right:4px"></div></div>
+   <div class="g card a" style="animation-delay:80ms"><div class="ct"><span class="k">Ranking · ${ps.lvl==='mun'||ps.lvl==='micro'?'URS':ps.lvl==='urs'?'URS':'macrorregiões'}</span><span class="s" style="margin:0">${ps.metric==='valor'?'% do valor apurado':'% de itens que atingiram'}</span></div><div id="rank" style="max-height:440px;overflow:auto;padding-right:4px"></div></div>
    <div style="display:flex;flex-direction:column;gap:14px">
-    <div class="g card a" style="animation-delay:140ms"><div class="ct"><span class="k">Etapas do monitoramento</span></div>
-     ${etapas.map((v,i)=>`<div style="margin:8px 0"><div class="row" style="justify-content:space-between;font-size:11px"><span>${i+1}. ${ETP[i]}</span><b class="strong">${n0.format(v)}</b></div><div class="bar" style="margin-top:4px"><i style="width:${o.n?v/o.n*100:0}%;animation-delay:${200+i*120}ms"></i></div></div>`).join('')}
-     <div class="s">Unidades que chegaram a cada etapa</div></div>
-    <div class="g card a" style="animation-delay:200ms"><div class="ct"><span class="k">Recursos às CMA</span></div>${recBox(RS)}</div>
+    <div class="g card a" style="animation-delay:140ms"><div class="ct"><span class="k">Até onde o monitoramento chegou · filtro</span>${ps.et?`<button class="back" id="etclr" style="font-size:11px;padding:3px 10px">✕ todas</button>`:''}</div>
+     ${['Ficou na coleta de dados','Chegou à ciência ou pedido de recurso','Foi analisado pela CMA'].map((l,i)=>`<div class="etf" data-e="${i+1}" style="margin:6px 0;padding:6px 8px;border-radius:10px;cursor:pointer;border:1px solid ${ps.et==String(i+1)?'rgba(16,185,129,.7)':'transparent'};background:${ps.et==String(i+1)?'var(--sel)':'transparent'};${ps.et&&ps.et!=String(i+1)?'opacity:.5':''}"><div class="row" style="justify-content:space-between;font-size:11.5px"><span>${i+1}. ${l}</span><b class="strong">${n0.format(etapas[i])}</b></div><div class="bar" style="margin-top:4px"><i style="width:${RS0.length?etapas[i]/RS0.length*100:0}%;animation-delay:${200+i*120}ms"></i></div></div>`).join('')}
+     <div class="s">Clique para ver só os itens em cada situação.${etapas[2]===0?' <b>Nenhum item desta política passou pela análise da CMA neste período.</b>':''}</div></div>
+    <div class="g card a" data-kpi="rec" style="animation-delay:200ms"><div class="ct"><span class="k">Pedidos de recurso às CMA</span></div>${recBox(RS)}</div>
    </div>
   </div>
   <div class="g card a" style="margin-top:14px"><div class="ct"><span class="k">Indicadores · clique para filtrar</span></div><div id="itab" style="overflow:auto"></div></div>
   <div class="mgrid" style="grid-template-columns:1.25fr 1fr">
    <div class="g card a"><div class="ct"><span class="k">Municípios · clique para abrir</span><input id="mq" placeholder="Buscar município" value="${esc(ps.mq)}" style="background:var(--ctl);color:var(--strong);border:1px solid var(--gb);border-radius:99px;padding:6px 12px;font:inherit;font-size:12px"></div><div id="mtab" style="max-height:520px;overflow:auto"></div></div>
-   <div class="g card a"><div class="ct"><span class="k">Recursos apresentados · justificativas e pareceres</span></div><div id="rlist" style="max-height:520px;overflow:auto"></div></div>
+   <div class="g card a"><div class="ct"><span class="k">Pedidos de recurso · o que o município pediu e o que a CMA decidiu</span></div><div id="rlist" style="max-height:520px;overflow:auto"></div></div>
   </div>`;
   bindNav();
   document.getElementById('bkp').onclick=()=>openPols();
@@ -500,14 +540,26 @@ function polView(){
   const pcl=document.getElementById('pclr');if(pcl)pcl.onclick=()=>{ps.sel=null;ps.ind='';ps.per='';polView()};
   const psc=document.getElementById('psclr');if(psc)psc.onclick=()=>{ps.sel=null;polView()};
   document.querySelectorAll('#plv button').forEach(b=>b.onclick=()=>{ps.lvl=b.dataset.k;ps.sel=null;polView()});
+  document.querySelectorAll('.etf').forEach(e=>e.onclick=()=>{ps.et=ps.et===e.dataset.e?'':e.dataset.e;polView()});const etc=document.getElementById('etclr');if(etc)etc.onclick=()=>{ps.et='';polView()};
+  const sn=esc(P.nome)+' · '+esc(selName);
+  bindKpis({mun:()=>modal('Municípios',sn,COMO+'Do menor para o maior % do valor apurado. Clique para abrir o município.</div>'+tabMun(RS)),
+    ind:()=>modal('Itens avaliados por indicador',sn,COMO+'Cada item é um indicador avaliado para um município (ou equipe/serviço). A soma de atingiu + não atingiu + sem informação dá o total de itens.</div>'+tabInd(RS)),
+    val:()=>modal('Valor previsto × apurado',sn+' · '+(ps.mom==='depois'?'depois da CMA':'antes da CMA'),COMO+'<b>Previsto</b>: valor total ligado às metas. <b>Apurado</b>: parte desse valor assegurada pelos resultados.</div><div class="ct"><span class="k">Por Unidade Regional</span></div>'+tabURS(RS)+'<div class="ct" style="margin-top:14px"><span class="k">Por indicador</span></div>'+tabInd(RS)),
+    pag:()=>modal('Pago em 2026 (BO)',sn,COMO+'Pagamentos feitos em 2026 no(s) programa(s) do BO ligado(s) a esta política'+(P.upgs&&P.upgs.length?': <b>'+P.upgs.map(esc).join(' · ')+'</b>':'')+'. Não é o pagamento só deste período de monitoramento: serve para comparar a ordem de grandeza.'+(CONF[P.upg_conf]?' <b>A ligação entre política e programa ainda precisa ser confirmada.</b>':'')+'</div>'+tabMun(RS)),
+    rec:()=>modal('Pedidos de recurso às CMA',sn,tabRec(RS)),
+    si:()=>modal('Itens sem informação',sn,COMO+'Itens em que o sistema não registrou se a meta foi atingida.</div>'+tabMun(RS.filter(r=>r.st===2)))});
   polMap(RI);polRank(RI);indTable(RP);munTable(RS);recList(RS);
   const mq=document.getElementById('mq');mq.oninput=()=>{ps.mq=mq.value;munTable(RS)};
 }
-function recBox(R){const rr=R.filter(r=>r.rec);if(!rr.length)return '<div class="s">Nenhum recurso apresentado.</div>';
-  const cats=MO.cats.map((c,i)=>[c,rr.filter(r=>r.cat===i).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);const mx=Math.max(...cats.map(x=>x[1]),1);
-  const def=rr.filter(r=>r.del===1).length,ind=rr.filter(r=>r.del===0).length,pend=rr.length-def-ind;
-  return `<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px"><span class="tag tag3">${def} deferidos</span><span class="tag" style="background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.35);color:#FB7185">${ind} indeferidos</span>${pend?`<span class="tag tag2">${pend} sem deliberação</span>`:''}</div>`+
-   cats.map(([c,v],i)=>`<div style="margin:6px 0"><div class="row" style="justify-content:space-between;font-size:11px"><span>${esc(c)}</span><b>${v}</b></div><div class="bar" style="margin-top:3px"><i style="width:${v/mx*100}%;background:linear-gradient(90deg,#F59E0B,#FB7185);animation-delay:${200+i*100}ms"></i></div></div>`).join('')}
+function recBox(R){const rr=R.filter(r=>r.rec);if(!rr.length)return '<div class="s">Nenhum pedido de recurso.</div>';
+  const cats=MO.cats.map((c,i)=>[c,rr.filter(r=>r.cat===i).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);const semcat=rr.filter(r=>r.cat<0).length;if(semcat)cats.push(['Motivo não informado',semcat]);const mx=Math.max(...cats.map(x=>x[1]),1);
+  const def=rr.filter(r=>r.del===1).length,ind=rr.filter(r=>r.del===0).length,pend=rr.length-def-ind,T=rr.length;
+  return `<div style="font-size:12px"><b class="strong" style="font-size:18px">${T}</b> pedidos de recurso</div>
+   <div class="k" style="margin-top:10px">Decisão da CMA</div><div style="display:flex;height:10px;border-radius:99px;overflow:hidden;margin:5px 0;background:var(--track)"><i style="width:${def/T*100}%;background:#10B981"></i><i style="width:${ind/T*100}%;background:#F43F5E"></i><i style="width:${pend/T*100}%;background:#94A3B8"></i></div>
+   <div class="row" style="gap:12px;flex-wrap:wrap;font-size:11px"><span><b class="up">${def}</b> deferidos</span><span><b class="dn">${ind}</b> indeferidos</span>${pend?`<span><b>${pend}</b> aguardando</span>`:''}</div>
+   <div class="k" style="margin-top:12px">Motivo do pedido</div>`+
+   cats.map(([c,v],i)=>`<div style="margin:6px 0"><div class="row" style="justify-content:space-between;font-size:11px"><span>${esc(c)}</span><b>${v}</b></div><div class="bar" style="margin-top:3px"><i style="width:${v/mx*100}%;background:linear-gradient(90deg,#F59E0B,#FB7185);animation-delay:${200+i*100}ms"></i></div></div>`).join('')+
+   `<div class="s" style="margin-top:6px">São os mesmos ${T} pedidos vistos de dois jeitos: pela decisão e pelo motivo. Clique para detalhar.</div>`}
 function polMap(R){
   const el=document.getElementById('pmap');const W=el.clientWidth,H=400;const lvl=ps.lvl;
   const topo=D['topo_'+(lvl==='mun'?'municipios':lvl)];const fc=topojson.feature(topo,topo.objects[Object.keys(topo.objects)[0]]);
@@ -517,7 +569,7 @@ function polMap(R){
   svg.selectAll('path').data(fc.features).join('path').attr('d',path).attr('stroke',css('--mstroke')).attr('stroke-width',lvl==='mun'?.35:1).style('cursor','pointer')
    .attr('fill',f=>{const x=a[fk(f)];const p=x?cellPerf(x):null;return p!=null?pctCol(p):css('--mnull')})
    .style('opacity',0).transition().delay((f,i)=>lvl==='mun'?i*0.7:i*30).duration(450).style('opacity',f=>!ps.sel||fk(f)===ps.sel?1:.3);
-  svg.selectAll('path').on('mousemove',(e,f)=>{const k=fk(f),x=a[k],nm=lvl==='mun'?f.properties.municipio:k;tip.innerHTML=`<b>${esc(nm)}</b><br>${x?`${pc(cellPerf(x))} ${ps.metric==='valor'?'do recurso apurado':'atingiram'} · ${x.n} unidade(s)`:'não participa'}`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1})
+  svg.selectAll('path').on('mousemove',(e,f)=>{const k=fk(f),x=a[k],nm=lvl==='mun'?f.properties.municipio:k;tip.innerHTML=`<b>${esc(nm)}</b><br>${x?`${pc(cellPerf(x))} ${ps.metric==='valor'?'do valor apurado':'atingiram'} · ${x.n} unidade(s)`:'não participa'}`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1})
    .on('mouseleave',()=>tip.style.opacity=0).on('click',(e,f)=>{tip.style.opacity=0;const k=fk(f);if(!a[k])return;ps.sel=ps.sel===k?null:k;polView()});
 }
 function polRank(R){
@@ -531,8 +583,9 @@ function polRank(R){
 function indTable(RP){
   const RR=ps.sel?RP.filter(r=>regKey(ps.lvl,r.c)===ps.sel):RP;
   const by={};for(const r of RR)(by[r.ind]=by[r.ind]||[]).push(r);
-  const rows=Object.entries(by).map(([i,a])=>{const o=agg(a);const res=a.map(r=>r.res).filter(v=>v!=null);return {i:+i,o,med:res.length?res.reduce((s,v)=>s+v,0)/res.length:null}}).sort((x,y)=>y.o.vm-x.o.vm||y.o.n-x.o.n);
-  document.getElementById('itab').innerHTML=`<table class="tb"><thead><tr><th>Indicador</th><th>Fonte</th><th style="text-align:right">Meta</th><th style="text-align:right">Resultado médio</th><th style="text-align:right">Unidades</th><th style="min-width:150px">Status no sistema</th><th style="text-align:right">Apurado / previsto</th></tr></thead><tbody>${rows.map(x=>{const I=MO.inds[x.i];return `<tr class="ir ${String(x.i)===ps.ind?'on':''}" data-i="${x.i}"><td style="max-width:420px"><div style="font-weight:600;color:var(--strong)">${esc(I.nome)}</div><div class="s">ID ${I.id}</div></td><td><span class="tag ${I.fonte==='Declaratório'?'tag2':''}" style="font-size:9px">${esc(I.fonte)}</span></td><td style="text-align:right">${nfx(I.meta)}</td><td style="text-align:right">${nfx(x.med)}</td><td style="text-align:right">${n0.format(x.o.n)}</td><td><div class="row" style="gap:8px"><b style="color:${pctCol(x.o.pct)};width:46px">${pc(x.o.pct)}</b><div style="flex:1">${stBar(x.o)}</div></div></td><td style="text-align:right;white-space:nowrap"><b style="color:${pctCol(x.o.pv)}">${pc(x.o.pv)}</b><div class="s">${ab(x.o.va)} de ${ab(x.o.vm)}</div></td></tr>`}).join('')}</tbody></table>`;
+  const rows=Object.entries(by).map(([i,a])=>{const o=agg(a);const res=a.map(r=>r.res).filter(v=>v!=null).sort((x,y)=>x-y);return {i:+i,o,med:res.length?res[Math.floor(res.length/2)]:null}}).sort((x,y)=>y.o.vm-x.o.vm||y.o.n-x.o.n);
+  document.getElementById('itab').innerHTML=`<table class="tb"><thead><tr><th>Indicador</th><th>Fonte</th><th style="text-align:right">Meta</th><th style="text-align:right" title="Valor do meio entre os municípios, na mesma unidade da meta">Resultado típico*</th><th style="text-align:right">Unidades</th><th style="min-width:150px">Metas atingidas (sistema)</th><th style="text-align:right">Valor apurado</th></tr></thead><tbody>${rows.map(x=>{const I=MO.inds[x.i];return `<tr class="ir ${String(x.i)===ps.ind?'on':''}" data-i="${x.i}"><td style="max-width:420px"><div style="font-weight:600;color:var(--strong)">${esc(I.nome)}</div><div class="s">ID ${I.id}</div></td><td><span class="tag ${I.fonte==='Declaratório'?'tag2':''}" style="font-size:9px">${esc(I.fonte)}</span></td><td style="text-align:right">${nfx(I.meta)}</td><td style="text-align:right">${nfx(x.med)}</td><td style="text-align:right">${n0.format(x.o.n)}</td><td><div class="row" style="gap:8px"><b style="color:${pctCol(x.o.pct)};width:46px">${pc(x.o.pct)}</b><div style="flex:1">${stBar(x.o)}</div></div></td><td style="text-align:right;white-space:nowrap"><b style="color:${pctCol(x.o.pv)}">${pc(x.o.pv)}</b><div class="s">${ab(x.o.va)} de ${ab(x.o.vm)}</div></td></tr>`}).join('')}</tbody></table>`;
+  document.getElementById('itab').insertAdjacentHTML('beforeend','<div class="s" style="margin-top:8px">* Meta e resultado estão na unidade de cada indicador (percentual, quantidade, valor por habitante etc.). O resultado típico é a mediana: metade dos municípios ficou acima e metade abaixo desse valor.</div>');
   document.querySelectorAll('#itab .ir').forEach(e=>e.onclick=()=>{ps.ind=ps.ind===e.dataset.i?'':e.dataset.i;polView()});
 }
 function munTable(R){
@@ -540,16 +593,16 @@ function munTable(R){
   let rows=Object.entries(by).map(([c,a])=>({c,o:agg(a)}));const q=(ps.mq||'').toLowerCase();
   if(q)rows=rows.filter(x=>M(x.c)[0].toLowerCase().includes(q));
   rows.sort((x,y)=>(perf(x.o)??2)-(perf(y.o)??2)||y.o.vm-x.o.vm);
-  document.getElementById('mtab').innerHTML=`<table class="tb"><thead><tr><th>Município</th><th style="text-align:right">Recurso apurado</th><th style="min-width:110px">Status no sistema</th><th style="text-align:right">Apurado / previsto</th><th style="text-align:center">Recurso</th></tr></thead><tbody>${rows.slice(0,400).map(x=>`<tr class="mr" data-c="${x.c}"><td><div style="font-weight:600;color:var(--strong)">${esc(M(x.c)[0])}</div><div class="s">URS ${esc(M(x.c)[1])}</div></td><td style="text-align:right;white-space:nowrap"><b style="color:${pctCol(x.o.pv)}">${pc(x.o.pv)}</b><div class="s">${x.o.at}/${x.o.at+x.o.na} atingiram</div></td><td>${stBar(x.o)}</td><td style="text-align:right;white-space:nowrap"><b class="acc">${ab(x.o.va)}</b><div class="s">de ${ab(x.o.vm)}</div></td><td style="text-align:center">${x.o.rec?`<span class="tag tag2" style="font-size:9px">${x.o.rec}</span>`:''}</td></tr>`).join('')}</tbody></table>${rows.length>400?`<div class="s">Mostrando 400 de ${rows.length} — use a busca.</div>`:''}`;
+  document.getElementById('mtab').innerHTML=`<table class="tb"><thead><tr><th>Município</th><th style="text-align:right">Valor apurado</th><th style="min-width:110px">Metas atingidas (sistema)</th><th style="text-align:right">Apurado / previsto</th><th style="text-align:center">Pediu recurso?</th></tr></thead><tbody>${rows.slice(0,400).map(x=>`<tr class="mr" data-c="${x.c}"><td><div style="font-weight:600;color:var(--strong)">${esc(M(x.c)[0])}</div><div class="s">URS ${esc(M(x.c)[1])}</div></td><td style="text-align:right;white-space:nowrap"><b style="color:${pctCol(x.o.pv)}">${pc(x.o.pv)}</b><div class="s">${x.o.at}/${x.o.at+x.o.na} atingiram</div></td><td>${stBar(x.o)}</td><td style="text-align:right;white-space:nowrap"><b class="acc">${ab(x.o.va)}</b><div class="s">de ${ab(x.o.vm)}</div></td><td style="text-align:center">${x.o.rec?`<span class="tag tag2" style="font-size:9px">${x.o.rec}</span>`:''}</td></tr>`).join('')}</tbody></table>${rows.length>400?`<div class="s">Mostrando 400 de ${rows.length} — use a busca.</div>`:''}`;
   document.querySelectorAll('#mtab .mr').forEach(e=>e.onclick=()=>{if(e.dataset.c!=='0')openMun(e.dataset.c)});
 }
 function recList(R){
   const rr=R.filter(r=>r.rec).sort((a,b)=>(b.del===1)-(a.del===1)||M(a.c)[0].localeCompare(M(b.c)[0]));
-  document.getElementById('rlist').innerHTML=rr.length?rr.slice(0,200).map(r=>`<details class="rc"><summary><div class="row" style="justify-content:space-between;gap:8px"><div style="min-width:0"><b class="strong">${esc(M(r.c)[0])}</b><div class="s ell">${esc(MO.inds[r.ind].nome)}</div></div>${r.del===1?'<span class="tag tag3" style="font-size:9px">Deferido</span>':r.del===0?'<span class="tag" style="font-size:9px;background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.35);color:#FB7185">Indeferido</span>':'<span class="tag tag2" style="font-size:9px">Em análise</span>'}</div></summary>
+  document.getElementById('rlist').innerHTML=rr.length?rr.slice(0,200).map(r=>`<details class="rc"><summary><div class="row" style="justify-content:space-between;gap:8px"><div style="min-width:0"><b class="strong">${esc(M(r.c)[0])}</b><div class="s ell">${esc(MO.inds[r.ind].nome)}</div></div>${r.del===1?'<span class="tag tag3" style="font-size:9px">Deferido</span>':r.del===0?'<span class="tag" style="font-size:9px;background:rgba(244,63,94,.12);border-color:rgba(244,63,94,.35);color:#FB7185">Indeferido</span>':'<span class="tag tag2" style="font-size:9px">Aguardando</span>'}</div></summary>
    <div class="det" style="margin-top:8px">${r.cat>=0?`<div><div class="k">Categoria</div><div class="dv">${esc(MO.cats[r.cat])}</div></div>`:''}<div><div class="k">Resultado apurado → após reunião</div><div class="dv">${nfx(r.res)} → ${nfx(r.rp)}</div></div>
    ${r.corr!=null?`<div><div class="k">Correção da parcela CMA</div><div class="dv">${fmt.format(r.corr)}</div></div>`:''}<div><div class="k">ID Solicitação</div><div class="dv">${r.sol}</div></div>
-   ${r.just>=0?`<div class="full"><div class="k">Justificativa do município</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.just])}</div></div>`:''}
-   ${r.par>=0?`<div class="full"><div class="k">Parecer e recomendação da CMA</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.par])}</div></div>`:''}</div></details>`).join('')+(rr.length>200?`<div class="s">Mostrando 200 de ${rr.length}.</div>`:''):'<div class="s">Nenhum recurso apresentado neste recorte.</div>';
+   ${r.just>=0?`<div class="full"><div class="k">O que o município pediu</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.just])}</div></div>`:''}
+   ${r.par>=0?`<div class="full"><div class="k">Resposta e recomendação da CMA</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.par])}</div></div>`:''}</div></details>`).join('')+(rr.length>200?`<div class="s">Mostrando 200 de ${rr.length}.</div>`:''):'<div class="s">Nenhum pedido de recurso neste recorte.</div>';
 }
 
 // ---------- seção de políticas na página do município
@@ -557,17 +610,17 @@ function munPolicies(c){
   if(!MO)return '';const R=MR.filter(r=>r.c===c);if(!R.length)return `<div class="g card a" style="margin-top:14px"><span class="k">Políticas monitoradas</span><div class="s">Nenhuma política monitorada para este município no último relatório.</div></div>`;
   const o=agg(R);const by={};for(const r of R)(by[r.pol]=by[r.pol]||[]).push(r);
   const pols=Object.entries(by).map(([p,a])=>({p:+p,a,o:agg(a)})).sort((x,y)=>y.o.vm-x.o.vm);
-  return `<div class="ct" style="margin:22px 0 10px"><span class="k">Políticas monitoradas · ${pols.length} política(s) · ${pc(o.pv)} do recurso apurado (${ab(o.va)} de ${ab(o.vm)}) · status no sistema: ${pc(o.pct)} atingiram</span></div>
+  return `<div class="ct" style="margin:22px 0 10px"><span class="k">Políticas monitoradas · ${pols.length} política(s) · apurou ${pc(o.pv)} do valor previsto (${ab(o.va)} de ${ab(o.vm)}) · metas atingidas no sistema: ${pc(o.pct)}</span></div>
   <div class="muns" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr));margin-top:0;align-items:start">${pols.map((x,j)=>{const P=MO.pols[x.p];return `
    <div class="g a" style="padding:14px 16px;animation-delay:${j*60}ms">
     <div class="row" style="justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><span class="tag" style="font-size:9px">${esc(P.bloco)}</span><span class="tag tag2" style="font-size:9px">Res. ${P.res}</span>
      <div class="pl" data-p="${x.p}" style="font-size:13px;font-weight:700;color:var(--strong);margin-top:6px;cursor:pointer">${esc(P.nome)} ›</div>
-     <div class="s">${[...new Set(x.a.map(r=>perLbl(r.per)))].join(' · ')} · apurado <b class="acc">${fmt.format(x.o.va)}</b> de ${fmt.format(x.o.vm)}</div></div>${ring(x.o.pv,52)}</div>
+     <div class="s">${[...new Set(x.a.map(r=>perLbl(r.per)))].join(' · ')} · apurado <b class="acc">${fmt.format(x.o.va)}</b> de ${fmt.format(x.o.vm)}${PAY[x.p]?` · pago em 2026 (BO): <b>${fmt.format(PAY[x.p][c]||0)}</b>`:''}</div></div>${ring(x.o.pv,52)}</div>
     <div style="margin-top:8px">${x.a.sort((a,b)=>a.st-b.st||a.ind-b.ind).map(r=>`<details class="rc" style="padding:6px 0"><summary><div class="row" style="gap:8px"><span title="${ps.metric==='valor'?(r.vm?pc((r.va||0)/r.vm)+' do valor apurado':'sem valor vinculado'):ST[r.st]}" style="width:8px;height:8px;border-radius:50%;background:${ps.metric==='valor'?(r.vm?pctCol((r.va||0)/r.vm):'#94A3B8'):STC[r.st]};flex:none"></span><span class="ell" style="flex:1;font-size:11px">${esc(MO.inds[r.ind].nome)}</span><span class="s" style="margin:0;white-space:nowrap">${nfx(r.res)} / meta ${nfx(r.meta)}</span>${r.rec?`<span class="tag tag2" style="font-size:8px;margin:0">recurso</span>`:''}</div></summary>
-     <div class="det" style="margin-top:6px"><div><div class="k">Status no sistema</div><div class="dv" style="color:${STC[r.st]};font-weight:700">${ST[r.st]}</div></div><div><div class="k">Recurso apurado</div><div class="dv" style="font-weight:700;color:${pctCol(r.vm?(r.va||0)/r.vm:null)}">${r.vm?pc((r.va||0)/r.vm):'—'}</div></div><div><div class="k">Faixa de desempenho</div><div class="dv">${r.fx>=0?esc(MO.faixas[r.fx]):'—'}</div></div>
+     <div class="det" style="margin-top:6px"><div><div class="k">Situação no sistema</div><div class="dv" style="color:${STC[r.st]};font-weight:700">${ST[r.st]}</div></div><div><div class="k">% apurado</div><div class="dv" style="font-weight:700;color:${pctCol(r.vm?(r.va||0)/r.vm:null)}">${r.vm?pc((r.va||0)/r.vm):'—'}</div></div><div><div class="k">Faixa de desempenho</div><div class="dv">${r.fx>=0?esc(MO.faixas[r.fx]):'—'}</div></div>
      <div><div class="k">Valor da meta</div><div class="dv">${fmt.format(r.vm)}</div></div><div><div class="k">Valor apurado (antes → depois da CMA)</div><div class="dv acc">${r.va!=null?fmt.format(r.va):'—'}${r.del>=0&&r.corr!=null?' → '+fmt.format(r.vm>0?Math.min(r.corr,r.vm):r.corr):''}</div></div>
      <div><div class="k">Etapa alcançada</div><div class="dv">${ETP[r.et-1]}</div></div><div><div class="k">Fonte</div><div class="dv">${esc(MO.inds[r.ind].fonte)}</div></div>
-     ${r.rec?`<div class="full sep" style="padding-top:8px"><div class="k">Recurso · ${r.del===1?'Deferido':r.del===0?'Indeferido':'em análise'}${r.cat>=0?' · '+esc(MO.cats[r.cat]):''}</div>${r.just>=0?`<div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.just])}</div>`:''}${r.par>=0?`<div class="k" style="margin-top:6px">Parecer da CMA</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.par])}</div>`:''}</div>`:''}</div></details>`).join('')}</div>
+     ${r.rec?`<div class="full sep" style="padding-top:8px"><div class="k">Recurso · ${r.del===1?'Deferido':r.del===0?'Indeferido':'aguardando decisão'}${r.cat>=0?' · '+esc(MO.cats[r.cat]):''}</div>${r.just>=0?`<div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.just])}</div>`:''}${r.par>=0?`<div class="k" style="margin-top:6px">Parecer da CMA</div><div class="dv" style="white-space:pre-wrap">${esc(MO.textos[r.par])}</div>`:''}</div>`:''}</div></details>`).join('')}</div>
    </div>`}).join('')}</div>`;
 }
 
@@ -597,22 +650,22 @@ function anaView(){
   </div>
   <div class="g flt a" style="margin:0 0 14px">
    ${metricSeg()}
-   <span class="k">Limiar crítico</span><select id="alim">${[.3,.5,.7,.9].map(v=>`<option value="${v}" ${an.lim===v?'selected':''}>abaixo de ${v*100}% do recurso apurado</option>`).join('')}</select>
+   <span class="k">Município crítico se</span><select id="alim">${[.3,.5,.7,.9].map(v=>`<option value="${v}" ${an.lim===v?'selected':''}>apurou menos de ${v*100}%</option>`).join('')}</select>
    <span class="k">Bloco</span><select id="abl"><option value="">Todos</option>${blocos.map(b=>`<option ${an.bloco===b?'selected':''}>${esc(b)}</option>`).join('')}</select>
    <span class="k">Política</span><select id="apol" style="flex:1;min-width:220px"><option value="">Todas as políticas</option>${MO.pols.map((p,i)=>[p,i]).filter(([p])=>!an.bloco||p.bloco===an.bloco).sort((a,b)=>a[0].nome.localeCompare(b[0].nome)).map(([p,i])=>`<option value="${i}" ${String(i)===an.pol?'selected':''}>${esc(p.nome)}</option>`).join('')}</select>
   </div>
   <div class="kpis">
-   <div class="g kpi a"><div class="k">Recurso vinculado às metas</div><div class="v grad" style="font-size:28px">${ab(vm)}</div><div class="s">${n0.format(R.length)} unidades monitoradas</div></div>
-   <div class="g kpi a" style="animation-delay:80ms"><div class="k">Apurado antes da CMA</div><div class="v" style="color:${pctCol(vm?va0/vm:null)}">${pc(vm?va0/vm:null)}</div><div class="s">${ab(va0)}</div></div>
-   <div class="g kpi a" style="animation-delay:160ms"><div class="k">Depois da avaliação das CMA</div><div class="v" style="color:${pctCol(vm?va1/vm:null)}">${pc(vm?va1/vm:null)}</div><div class="s">${ab(va1)} · <span class="up">+${ab(va1-va0).replace('R$ ','R$ ')}</span> após as deliberações das CMA</div></div>
-   <div class="g kpi a warn" style="animation-delay:240ms"><div class="k">Recurso não apurado</div><div class="v">${ab(vm-(ps.mom==='depois'?va1:va0))}</div><div class="s">${ps.mom==='depois'?'depois':'antes'} da CMA · o que os municípios deixaram de receber</div></div>
-   <div class="g kpi a" style="animation-delay:320ms;border-color:rgba(244,63,94,.4)"><div class="k" style="color:#FB7185">Municípios críticos</div><div class="v">${n0.format(crit)}</div><div class="s">de ${n0.format(nm)} · abaixo de ${an.lim*100}% do recurso</div></div>
+   <div class="g kpi a" data-kpi="vm"><div class="k">Valor previsto</div><div class="v grad" style="font-size:28px">${ab(vm)}</div><div class="s">se todas as metas fossem cumpridas · ${n0.format(R.length)} itens</div></div>
+   <div class="g kpi a" data-kpi="antes" style="animation-delay:80ms"><div class="k">Apurado antes da CMA</div><div class="v" style="color:${pctCol(vm?va0/vm:null)}">${pc(vm?va0/vm:null)}</div><div class="s">${ab(va0)} · resultado da coleta</div></div>
+   <div class="g kpi a" data-kpi="depois" style="animation-delay:160ms"><div class="k">Apurado depois da CMA</div><div class="v" style="color:${pctCol(vm?va1/vm:null)}">${pc(vm?va1/vm:null)}</div><div class="s">${ab(va1)} · <span class="up">+${ab(va1-va0).replace('R$ ','R$ ')}</span> com os pedidos deferidos</div></div>
+   <div class="g kpi a warn" data-kpi="gap" style="animation-delay:240ms"><div class="k">Valor não apurado</div><div class="v">${ab(vm-(ps.mom==='depois'?va1:va0))}</div><div class="s">${ps.mom==='depois'?'depois':'antes'} da CMA · metas não cumpridas</div></div>
+   <div class="g kpi a" data-kpi="crit" style="animation-delay:320ms;border-color:rgba(244,63,94,.4)"><div class="k" style="color:#FB7185">Municípios críticos</div><div class="v">${n0.format(crit)}</div><div class="s">de ${n0.format(nm)} · apuraram menos de ${an.lim*100}% do previsto</div></div>
   </div>
   <div class="mgrid" style="grid-template-columns:1.1fr 1fr;margin-top:0">
-   <div class="g card a"><div class="ct"><span class="k">Antes × depois da avaliação das CMA · por política</span><span class="legend"><span style="color:#94A3B8">● antes</span><span class="acc">● depois</span></span></div><div id="abd" style="max-height:470px;overflow:auto;padding-right:4px"></div>
-    <div class="s" style="margin-top:8px">${n0.format(rec.length)} recursos às CMA: <b class="up">${def.length} deferidos</b> · ${ind.length} indeferidos${pend.length?` · ${pend.length} sem deliberação`:''}.${incons?` ${incons} correções acima do valor da meta foram limitadas ao valor da meta.`:''}</div></div>
+   <div class="g card a"><div class="ct"><span class="k">Antes × depois da análise da CMA · por política</span><span class="legend"><span style="color:#94A3B8">● antes</span><span class="acc">● depois</span></span></div><div id="abd" style="max-height:470px;overflow:auto;padding-right:4px"></div>
+    <div class="s" style="margin-top:8px">${n0.format(rec.length)} pedidos de recurso às CMA = <b class="up">${def.length} deferidos</b> + ${ind.length} indeferidos${pend.length?` + ${pend.length} aguardando decisão`:''}.${incons?` Em ${incons} casos a correção passava do valor previsto e foi limitada a ele.`:''}</div></div>
    <div class="g card a" style="animation-delay:80ms"><div class="ct"><span class="k">Matriz de priorização dos indicadores</span><span class="s" style="margin:0">clique numa bolha para abrir</span></div><div id="amx"></div>
-    <div class="s">Eixo X: participação do indicador no recurso total · eixo Y: ${MLBL()} · tamanho: municípios. Quadrante vermelho = muito recurso e baixo desempenho.</div></div>
+    <div class="s">Para a direita: indicador com mais dinheiro em jogo · para cima: melhor resultado (${MLBL()}) · tamanho da bolha: nº de municípios. Canto vermelho = muito dinheiro e resultado baixo → prioridade.</div></div>
   </div>
   <div class="g card a" style="margin-top:14px"><div class="ct"><span class="k">Regiões mais frágeis</span><div class="seg" id="alv">${['macro','urs','micro'].map(k=>`<button data-k="${k}" class="${an.lvl===k?'on':''}">${LVN[k]}</button>`).join('')}</div></div>
    <div class="main" style="grid-template-columns:1fr 1.5fr;margin:0"><div id="amap" style="height:420px"></div><div id="afr" style="max-height:440px;overflow:auto"></div></div></div>
@@ -631,6 +684,12 @@ function anaView(){
   document.getElementById('aurs').onchange=e=>{an.urs=e.target.value;anaPri(R)};
   const q=document.getElementById('apq');q.oninput=()=>{an.pq=q.value;anaPri(R)};
   document.getElementById('acsv').onclick=()=>anaPri(R,true);
+  const crR=R.filter(r=>bm[r.c]&&bm[r.c].va/bm[r.c].vm<an.lim);
+  bindKpis({vm:()=>modal('Valor previsto','Análise para intervenção',COMO+'Valor que os municípios receberiam se cumprissem todas as metas, por política.</div>'+tabPol(R)),
+    antes:()=>{const s=ps.mom;ps.mom='antes';const h=tabPol(R);ps.mom=s;modal('Apurado antes da CMA','resultado da coleta de dados',COMO+'Quanto do valor previsto foi apurado pelo resultado <b>antes</b> de a CMA analisar os pedidos de recurso.</div>'+h)},
+    depois:()=>{const s=ps.mom;ps.mom='depois';const h=tabPol(R);ps.mom=s;modal('Apurado depois da CMA','com as correções aprovadas',COMO+'Resultado final, depois que a CMA deferiu ou indeferiu os pedidos de recurso. A diferença para o "antes" vem dos pedidos deferidos.</div>'+h+'<div class="ct" style="margin-top:14px"><span class="k">Pedidos de recurso</span></div>'+tabRec(R))},
+    gap:()=>modal('Valor não apurado',ps.mom==='depois'?'depois da CMA':'antes da CMA',COMO+'Diferença entre o previsto e o apurado. Municípios com a maior perda aparecem primeiro na lista de prioridades abaixo.</div><div class="ct"><span class="k">Por Unidade Regional</span></div>'+tabURS(R)+'<div class="ct" style="margin-top:14px"><span class="k">Por política</span></div>'+tabPol(R)),
+    crit:()=>modal('Municípios críticos','apuraram menos de '+an.lim*100+'% do valor previsto',COMO+'Municípios que, somando todas as políticas filtradas, apuraram menos de '+an.lim*100+'% do previsto. Mude o corte em "Município crítico se". Clique para abrir o município.</div>'+tabMun(crR))});
   anaBefore(R);anaMatrix(R);anaFragil(R);anaDisp(R);anaPri(R);
 }
 function anaBefore(R){
@@ -641,7 +700,7 @@ function anaBefore(R){
    <div style="position:relative;height:10px;margin-top:4px;border-radius:99px;background:var(--track);overflow:hidden">
     <i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(1,x.a1||0)*100}%;background:${pctCol(x.a1)};opacity:.9;border-radius:99px;transform-origin:left;animation:grow 1s ${j*40}ms both"></i>
     <i style="position:absolute;left:0;top:3px;height:4px;width:${Math.min(1,x.a0||0)*100}%;background:#E2E8F0;opacity:.85;border-radius:99px;transform-origin:left;animation:grow 1s ${j*40+150}ms both"></i></div>
-   <div class="s" style="margin-top:2px">${x.rec} recurso(s) · ${x.def} deferido(s) · recurso vinculado ${ab(x.vm)}</div></div>`).join('');
+   <div class="s" style="margin-top:2px">${x.rec} pedido(s) de recurso · ${x.def} deferido(s) · valor previsto ${ab(x.vm)}</div></div>`).join('');
   document.querySelectorAll('#abd .pl2').forEach(e=>e.onclick=()=>openPol(+e.dataset.p));
 }
 function anaMatrix(R){
@@ -652,14 +711,14 @@ function anaMatrix(R){
   const xt=0.02,yt=an.lim;
   const svg=d3.select(el).append('svg').attr('viewBox',`0 0 ${W} ${H}`).attr('width','100%').attr('height',H);
   svg.append('rect').attr('x',x(xt)).attr('y',y(yt)).attr('width',Math.max(0,W-m.r-x(xt))).attr('height',Math.max(0,H-m.b-y(yt))).attr('fill','rgba(244,63,94,.10)').attr('stroke','rgba(244,63,94,.35)').attr('stroke-dasharray','4 3').attr('rx',8);
-  svg.append('text').attr('x',W-m.r-8).attr('y',y(yt)+14).attr('text-anchor','end').style('fill','#FB7185').attr('font-size',10).attr('font-weight',700).text('PRIORIDADE: muito recurso, baixo desempenho');
+  svg.append('text').attr('x',W-m.r-8).attr('y',y(yt)+14).attr('text-anchor','end').style('fill','#FB7185').attr('font-size',10).attr('font-weight',700).text('PRIORIDADE: muito dinheiro, resultado baixo');
   svg.append('g').attr('transform',`translate(0,${H-m.b})`).call(d3.axisBottom(x).tickValues([.005,.02,.05,.1,.2].filter(v=>v<=xm)).tickFormat(d=>(d*100)+'%')).call(g=>{g.selectAll('text').style('fill','var(--mut)');g.selectAll('line,path').style('stroke','var(--softb)')});
   svg.append('g').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(5).tickFormat(d=>Math.round(d*100)+'%')).call(g=>{g.selectAll('text').style('fill','var(--mut)');g.selectAll('line,path').style('stroke','var(--softb)')});
-  svg.append('text').attr('x',W/2).attr('y',H-4).attr('text-anchor','middle').style('fill','var(--mut)').attr('font-size',10).text('participação no recurso total (escala raiz)');
+  svg.append('text').attr('x',W/2).attr('y',H-4).attr('text-anchor','middle').style('fill','var(--mut)').attr('font-size',10).text('parte do valor previsto total');
   const tip=document.getElementById('tip');
   svg.selectAll('circle.b').data(pts.sort((a,b)=>b.n-a.n)).join('circle').attr('class','b').attr('cx',d=>x(d.sh)).attr('cy',d=>y(d.y)).attr('fill',d=>pctCol(d.y)).attr('fill-opacity',.75).attr('stroke','var(--bg1)').style('cursor','pointer')
    .attr('r',0).transition().delay((d,i)=>i*12).duration(500).attr('r',d=>rr(d.n));
-  svg.selectAll('circle.b').on('mousemove',(e,d)=>{tip.innerHTML=`<b>${esc(MO.inds[d.i].nome)}</b><br><span class="s">${esc(MO.pols[d.p].nome)}</span><br>${pc(d.sh)} do recurso · ${pc(d.y)} ${ps.metric==='valor'?'apurado':'atingiram'}<br>não apurado: <b>${ab(d.gap)}</b> · ${d.n} municípios`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1})
+  svg.selectAll('circle.b').on('mousemove',(e,d)=>{tip.innerHTML=`<b>${esc(MO.inds[d.i].nome)}</b><br><span class="s">${esc(MO.pols[d.p].nome)}</span><br>${pc(d.sh)} do valor previsto · ${pc(d.y)} ${ps.metric==='valor'?'apurado':'atingiram'}<br>não apurado: <b>${ab(d.gap)}</b> · ${d.n} municípios`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1})
    .on('mouseleave',()=>tip.style.opacity=0).on('click',(e,d)=>{tip.style.opacity=0;openPol(d.p);ps.ind=String(d.i);polView()});
 }
 function anaFragil(R){
@@ -700,9 +759,9 @@ function anaPri(R,exp){
   if(an.urs)rows=rows.filter(x=>M(x.c)[1]===an.urs);const q=(an.pq||'').toLowerCase();if(q)rows=rows.filter(x=>M(x.c)[0].toLowerCase().includes(q));
   rows.sort((a,b)=>b.gap-a.gap);
   if(exp){csvDownload(`prioridades_intervencao_${new Date().toISOString().slice(0,10)}.csv`,[['Município','URS','Microrregião','Macrorregião','Política','Nº Resolução','Bloco','Desempenho (%)','Medida','Momento','Valor da Meta (R$)','Valor apurado (R$)','Não apurado (R$)','Indicadores abaixo do limiar','Recursos às CMA','Deferidos'],
-    ...rows.map(x=>{const m=M(x.c),P=MO.pols[x.p];return [m[0],m[1],m[2],m[3],P.nome,P.res,P.bloco,brl2(x.v*100),ps.metric==='valor'?'% recurso apurado':'status no sistema',ps.mom==='depois'?'depois da CMA':'antes da CMA',brl2(x.o.vm),brl2(x.o.va),brl2(x.gap),[...x.below].map(i=>MO.inds[i].nome).join(' | '),x.rec,x.def]})]);return}
+    ...rows.map(x=>{const m=M(x.c),P=MO.pols[x.p];return [m[0],m[1],m[2],m[3],P.nome,P.res,P.bloco,brl2(x.v*100),ps.metric==='valor'?'% do valor apurado':'situação no sistema',ps.mom==='depois'?'depois da CMA':'antes da CMA',brl2(x.o.vm),brl2(x.o.va),brl2(x.gap),[...x.below].map(i=>MO.inds[i].nome).join(' | '),x.rec,x.def]})]);return}
   document.getElementById('apri').innerHTML=`<div class="s" style="margin-bottom:6px">${n0.format(rows.length)} combinações município × política abaixo de ${an.lim*100}% · ordenadas pelo valor não apurado</div>
-  <table class="tb"><thead><tr><th>Município</th><th>Política</th><th style="text-align:right">Desempenho</th><th style="text-align:right">Não apurado</th><th>Indicadores abaixo do limiar</th><th style="text-align:center">Recurso</th></tr></thead><tbody>${rows.slice(0,300).map(x=>`<tr class="pr" data-c="${x.c}"><td><div style="font-weight:600;color:var(--strong)">${esc(M(x.c)[0])}</div><div class="s">URS ${esc(M(x.c)[1])} · ${esc(M(x.c)[3])}</div></td><td style="max-width:260px"><div class="ell">${esc(MO.pols[x.p].nome)}</div><div class="s">Res. ${MO.pols[x.p].res}</div></td><td style="text-align:right"><b style="color:${pctCol(x.v)}">${pc(x.v)}</b></td><td style="text-align:right;white-space:nowrap"><b>${ab(x.gap)}</b><div class="s">de ${ab(x.o.vm)}</div></td><td style="font-size:10.5px;max-width:320px">${[...x.below].slice(0,3).map(i=>`<div class="ell">• ${esc(MO.inds[i].nome)}</div>`).join('')}${x.below.size>3?`<div class="s">+${x.below.size-3}</div>`:''}</td><td style="text-align:center">${x.rec?`<span class="tag ${x.def?'tag3':'tag2'}" style="font-size:9px">${x.def?x.def+' deferido(s)':x.rec+' recurso(s)'}</span>`:''}</td></tr>`).join('')}</tbody></table>${rows.length>300?`<div class="s">Mostrando 300 de ${n0.format(rows.length)} — baixe a planilha para ver todas.</div>`:''}`;
+  <table class="tb"><thead><tr><th>Município</th><th>Política</th><th style="text-align:right">Desempenho</th><th style="text-align:right">Não apurado</th><th>Indicadores abaixo do limiar</th><th style="text-align:center">Pediu recurso?</th></tr></thead><tbody>${rows.slice(0,300).map(x=>`<tr class="pr" data-c="${x.c}"><td><div style="font-weight:600;color:var(--strong)">${esc(M(x.c)[0])}</div><div class="s">URS ${esc(M(x.c)[1])} · ${esc(M(x.c)[3])}</div></td><td style="max-width:260px"><div class="ell">${esc(MO.pols[x.p].nome)}</div><div class="s">Res. ${MO.pols[x.p].res}</div></td><td style="text-align:right"><b style="color:${pctCol(x.v)}">${pc(x.v)}</b></td><td style="text-align:right;white-space:nowrap"><b>${ab(x.gap)}</b><div class="s">de ${ab(x.o.vm)}</div></td><td style="font-size:10.5px;max-width:320px">${[...x.below].slice(0,3).map(i=>`<div class="ell">• ${esc(MO.inds[i].nome)}</div>`).join('')}${x.below.size>3?`<div class="s">+${x.below.size-3}</div>`:''}</td><td style="text-align:center">${x.rec?`<span class="tag ${x.def?'tag3':'tag2'}" style="font-size:9px">${x.def?x.def+' deferido(s)':x.rec+' recurso(s)'}</span>`:''}</td></tr>`).join('')}</tbody></table>${rows.length>300?`<div class="s">Mostrando 300 de ${n0.format(rows.length)} — baixe a planilha para ver todas.</div>`:''}`;
   document.querySelectorAll('#apri .pr').forEach(e=>e.onclick=()=>openMun(e.dataset.c));
 }
 

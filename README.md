@@ -22,17 +22,26 @@ Para atualizar na hora, use a aba **Actions › Atualizar painel › Run workflo
 - **Como atualizar** (escolha um):
   1. **Automático:** salve o relatório sempre no mesmo arquivo do SharePoint e crie o segredo `MONITORAMENTO_URL` com o link "Qualquer pessoa com o link".
   2. **Manual:** suba o relatório novo como `dados/relatorio_monitoramento.xlsx` (Add file › Upload files). O site é republicado sozinho.
-- **Duas medidas de desempenho** (botão "Medir por"):
-  - **% do recurso apurado** = soma do *Valor Apurado* ÷ soma do *Valor da Meta*. É o padrão.
-  - **Status no sistema** = unidades com *Status Cumprimento* "Atingiu" ÷ (Atingiu + Não Atingiu).
+- **Duas medidas de desempenho** (botão "Medir pelo"):
+  - **% do valor apurado** = soma do *Valor Apurado* ÷ soma do *Valor da Meta* (valor previsto). É o padrão.
+  - **Situação no sistema** = itens com *Status Cumprimento* "Atingiu" ÷ (Atingiu + Não Atingiu).
+- **Cards clicáveis:** todo card com "detalhar ›" abre uma tabela por política, município, URS ou indicador.
+- **Filtro de etapa:** na página da política, o card "Até onde o monitoramento chegou" filtra os itens pela etapa mais avançada.
+
+## Ligação pagamentos × políticas
+
+O BO não traz a resolução da política (o "Num Ref" é a resolução do pagamento). A ligação é feita pela tabela **`scripts/depara_politica_programa.csv`**:
+- cada linha liga um *Nº Resolução* da política a uma *Unid Programação Gasto* do BO, com a coluna **Confiança** (alta, media, a confirmar, sem correspondência);
+- o painel soma, por município, o que foi pago em 2026 nesses programas e mostra como **"Pago em 2026 (BO)"**;
+- para corrigir ou incluir uma ligação, edite o CSV (separador `;`) e suba de novo. O site é republicado sozinho.
 
 ## Análise para intervenção (aba Análise)
 
 - **Antes × depois da CMA:**
   - *antes* = Valor Apurado na coleta;
-  - *depois* = aplica a **Correção da Parcela CMA** dos recursos deliberados, limitada ao Valor da Meta. O botão "Momento" troca entre os dois em todo o painel.
+  - *depois* = aplica a **Correção da Parcela CMA** dos pedidos de recurso já decididos, limitada ao Valor da Meta. O botão "Quando" troca entre os dois em todo o painel.
 - **Matriz de priorização:** cada indicador posicionado pela participação no recurso total × desempenho. O quadrante vermelho reúne os indicadores com muito recurso e baixo desempenho.
-- **Regiões mais frágeis:** macro, URS ou micro ordenadas pelo desempenho, com municípios críticos (abaixo do limiar), políticas abaixo do limiar, valor não apurado e as piores políticas.
+- **Regiões mais frágeis:** macro, URS ou micro ordenadas pelo desempenho, com municípios críticos (abaixo do corte), políticas abaixo do corte, valor não apurado e as piores políticas.
 - **Disparidades:** amplitude, em pontos percentuais, entre a melhor e a pior macrorregião em cada política.
 - **Lista de prioridades:** município × política abaixo do limiar, ordenada pelo valor não apurado. Pode ser baixada em CSV para os planos de intervenção.
 
@@ -65,5 +74,6 @@ No fluxo do Power Automate, depois da ação que salva a planilha, adicione a a�
 | `scripts/gerar_dados.py` | transforma a planilha do BO em `dados.json` |
 | `monitoramento.json` | dados das políticas gerados pelo script. Esta cópia é a reserva |
 | `scripts/gerar_monitoramento.py` | transforma o relatório de monitoramento (aba `relatorio 1`) em `monitoramento.json` |
+| `scripts/depara_politica_programa.csv` | ligação política (resolução) × programa do BO (Unid Programação Gasto) |
 | `scripts/regionalizacao.csv` | municípios × URS × micro × macro × população (PDR/MG 2026) |
 | `.github/workflows/atualizar-painel.yml` | agenda e publicação automática |
