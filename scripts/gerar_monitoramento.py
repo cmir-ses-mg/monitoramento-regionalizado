@@ -166,6 +166,15 @@ def main():
             txt(ult["Razão Social"]),
         ])
 
+    # de-para Política × Programa do BO (UPG), para ligar monitoramento e pagamentos
+    dp = AQUI / "depara_politica_programa.csv"
+    if dp.exists():
+        t = pd.read_csv(dp, sep=";", dtype=str, encoding="utf-8-sig").fillna("")
+        for p in pols:
+            linhas = t[(t["Nº Resolução"].str.strip() == str(p["res"])) & (t["Unid Programação Gasto - Descrição"].str.strip() != "")]
+            p["upgs"] = linhas["Unid Programação Gasto - Descrição"].str.strip().tolist()
+            p["upg_conf"] = (linhas["Confiança"].str.strip().tolist() or [""])[0]
+
     # razão social vira índice (economiza espaço)
     benefs = sorted({r[-1] for r in rows})
     bi = {b: i for i, b in enumerate(benefs)}
