@@ -1,0 +1,97 @@
+name: Atualizar painel
+
+on:
+  schedule:
+    - cron: "17 9 * * *"    # 06:17 (Brasília) – depois que o e-mail do BO chega
+    - cron: "17 15 * * *"   # 12:17 (Brasília) – repescagem
+  workflow_dispatch:         # botão "Run workflow" na aba Actions
+  repository_dispatch:       # disparo pelo Power Automate (conector GitHub)
+    types: [bopainel-atualizado]
+  push:
+    branches: [main]
+    paths: ["index.html", "*.json", "dados/**", "scripts/**", "mapas/**", ".github/workflows/**"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pandas openpyxl
+
+      - name: Baixar a planilha do SharePoint
+        id: baixar
+        env:
+          CSV_URL: ${{ secrets.BOPAINEL_URL }}
+        run: |
+          if [ -z "$CSV_URL" ]; then
+            echo "::warning::Segredo BOPAINEL_URL não configurado – publicando o dados.json que já está no repositório."
+            echo "ok=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          case "$CSV_URL" in *\?*) URL="$CSV_URL&download=1";; *) URL="$CSV_URL?download=1";; esac
+          if curl -fsSL --retry 3 --retry-delay 10 -o BOPAINEL.csv "$URL" && head -c 400 BOPAINEL.csv | grep -q "Credor"; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Não consegui baixar a planilha (o link expirou, mudou ou passou a exigir login)."
+            exit 1
+          fi
+
+      - name: Gerar dados.json
+        if: steps.baixar.outputs.ok == 'true'
+        run: python scripts/gerar_dados.py BOPAINEL.csv dados.json
+
+      - name: Baixar o relatório de monitoramento das políticas
+        id: mon
+        env:
+          MON_URL: ${{ secrets.MONITORAMENTO_URL }}
+        run: |
+          if [ -n "$MON_URL" ]; then
+            case "$MON_URL" in *\?*) URL="$MON_URL&download=1";; *) URL="$MON_URL?download=1";; esac
+            if curl -fsSL --retry 3 --retry-delay 10 -o relatorio_monitoramento.xlsx "$URL"; then
+              echo "arq=relatorio_monitoramento.xlsx" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            echo "::warning::Não consegui baixar o relatório de monitoramento pelo link – usando o arquivo do repositório, se houver."
+          fi
+          if [ -f dados/relatorio_monitoramento.xlsx ]; then
+            echo "arq=dados/relatorio_monitoramento.xlsx" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Sem relatório novo – publicando o monitoramento.json que já está no repositório."
+          fi
+
+      - name: Gerar monitoramento.json
+        if: steps.mon.outputs.arq != ''
+        run: python scripts/gerar_monitoramento.py "${{ steps.mon.outputs.arq }}" monitoramento.json BOPAINEL.csv
+
+      - name: Montar o site
+        run: |
+          mkdir -p _site
+          cp index.html dados.json _site/
+          [ -f monitoramento.json ] && cp monitoramento.json _site/
+          cp -r mapas _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
